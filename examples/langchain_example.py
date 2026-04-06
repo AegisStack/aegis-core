@@ -54,16 +54,16 @@ def main():
     print("\nTesting small refund (should be allowed):")
     try:
         result = tools[0].func(order_id="ord_123", amount_usd=100)
-        print(f"✓ Success: {result}")
+        print(f"[OK] Success: {result}")
     except aegis.AegisViolationError as e:
-        print(f"✗ Denied: {e}")
+        print(f"[DENIED] {e}")
 
     print("\nTesting large refund (should be denied):")
     try:
         result = tools[0].func(order_id="ord_456", amount_usd=5000)
-        print(f"✓ Success: {result}")
+        print(f"[OK] Success: {result}")
     except aegis.AegisViolationError as e:
-        print(f"✗ Denied: {e}")
+        print(f"[DENIED] {e}")
 
 
 if __name__ == "__main__":

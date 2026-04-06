@@ -45,35 +45,35 @@ def main():
     print("=== Test 1: Small refund (should be allowed) ===")
     try:
         result = wrapped_refund(order_id="ord_123", amount_usd=100)
-        print(f"✓ Success: {result}")
+        print(f"[OK] Success: {result}")
     except aegis.AegisViolationError as e:
-        print(f"✗ Denied: {e}")
+        print(f"[DENIED] {e}")
 
     print("\n=== Test 2: Large refund (should be denied) ===")
     try:
         result = wrapped_refund(order_id="ord_456", amount_usd=5000)
-        print(f"✓ Success: {result}")
+        print(f"[OK] Success: {result}")
     except aegis.AegisViolationError as e:
-        print(f"✗ Denied: {e}")
+        print(f"[DENIED] {e}")
 
     print("\n=== Test 3: CRM update (always allowed) ===")
     try:
         result = wrapped_crm(customer_id="cust_789", notes="Customer requested refund")
-        print(f"✓ Success: {result}")
+        print(f"[OK] Success: {result}")
     except aegis.AegisViolationError as e:
-        print(f"✗ Denied: {e}")
+        print(f"[DENIED] {e}")
 
     print("\n=== Test 4: Deploy (always denied) ===")
     try:
         result = wrapped_deploy(environment="production")
-        print(f"✓ Success: {result}")
+        print(f"[OK] Success: {result}")
     except aegis.AegisViolationError as e:
-        print(f"✗ Denied: {e}")
+        print(f"[DENIED] {e}")
 
     # Close the audit sink
     audit_sink.close()
 
-    print("\n✓ Audit trail written to ./audit/billing-agent.jsonl")
+    print("\n[OK] Audit trail written to ./audit/billing-agent.jsonl")
 
 
 if __name__ == "__main__":

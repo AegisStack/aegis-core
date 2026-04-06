@@ -43,9 +43,9 @@ def main():
             for amount in [100, 500, 3000]:
                 try:
                     result = wrapped_tools[0](amount=amount)
-                    print(f"  Amount ${amount}: ✓ Allowed")
+                    print(f"  Amount ${amount}: [OK] Allowed")
                 except aegis.AegisViolationError:
-                    print(f"  Amount ${amount}: ✗ Denied")
+                    print(f"  Amount ${amount}: [DENIED]")
 
         except aegis.AegisPolicyLoadError as e:
             print(f"  Policy not found for {customer}: {e}")
