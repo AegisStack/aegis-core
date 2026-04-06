@@ -1,0 +1,577 @@
+﻿Aegis
+Technical Specification  ·  SDK v0.1
+Policy Enforcement and Observability for Agent Builders
+
+
+Status
+	Draft — Internal Review
+	Version
+	0.1.0
+	Date
+	April 6, 2026
+	Scope
+	Python SDK — Phase 1 Core Enforcement
+	Primary buyer
+	Companies building agent products and MCP servers
+	
+
+1. Overview
+Aegis is a Python SDK that agent builders and MCP server authors embed into their products. It wraps tool calls, evaluates them against customer-configurable policies, and produces structured audit records of every action. It gives agent products two things they currently cannot offer enterprise customers: infra-enforced policy controls and a policy-aware audit trail.
+
+
+Design principle
+Enforcement happens at the tool call layer, not the prompt layer. An agent cannot exceed the bounds defined in the customer policy regardless of what the model decides. The customer's policy is the source of truth, not the system prompt.
+	
+
+1.1 What Aegis Is Not
+* A replacement for MCP, LangChain, CrewAI, or any orchestration framework
+* A prompt injection defense system
+* A model alignment or fine-tuning tool
+* A generic tracing or logging product competing with LangSmith or Langfuse
+* An enterprise security tool sold directly to security teams
+
+
+1.2 Design Goals
+* Zero-friction embedding: one function call wraps all tools
+* Customer-configurable: enterprise customers set their own policy without touching agent code
+* Framework-agnostic: works wherever tools are defined as Python callables or MCP tool handlers
+* Fail-safe: deny on policy ambiguity, never silently allow
+* Observability-native: every enforcement decision is a structured, queryable record from day one
+
+
+
+
+2. Architecture
+2.1 System Overview
+
+
+  ┌────────────────────────────────────────────────────┐
+	  │  Agent Builder's Product                           │
+	  │  (LangChain / CrewAI / AutoGen / raw / MCP host)  │
+	  └───────────────────────┬────────────────────────────┘
+	                          │  agent decides to call a tool
+	                          v
+	  ┌────────────────────────────────────────────────────┐
+	  │  Aegis SDK                                         │
+	  │                                                    │
+	  │  PolicyLoader      loads customer policy           │
+	  │  PolicyEngine      evaluates tool call             │
+	  │  EscalationManager routes high-risk actions        │
+	  │  AuditWriter       writes structured record        │
+	  │  ObsSink           forwards to observability layer │
+	  └───────────────────────┬────────────────────────────┘
+	                          │  Allow / Deny / Escalate
+	                          v  (if allowed)
+	  ┌────────────────────────────────────────────────────┐
+	  │  Tool / API / MCP Server / Database               │
+	  └────────────────────────────────────────────────────┘
+	                          │
+	                          v
+	  ┌────────────────────────────────────────────────────┐
+	  │  Aegis Cloud (Phase 2)                            │
+	  │  Audit storage, observability dashboard,           │
+	  │  customer policy UI, anomaly detection             │
+	  └────────────────────────────────────────────────────┘
+	
+
+2.2 Interception Mechanism
+Aegis uses Python's wrapper pattern. aegis.wrap() accepts a list of tool callables and returns new callables that are interface-identical to the originals but route through the policy engine before execution. The agent framework cannot distinguish wrapped tools from unwrapped ones because the wrapper preserves the original function's name, docstring, and type signature.
+
+
+# Original tool — unchanged
+	def issue_refund(order_id: str, amount_usd: float) -> dict:
+	    """Issue a refund for the given order."""
+	    ...
+	 
+	# After aegis.wrap() — interface identical, enforcement added
+	# The agent framework sees the same function signature
+	# Aegis intercepts the call before it reaches the real function
+	
+
+
+
+3. Policy Schema
+3.1 Policy File Format
+Each customer deployment has one policy file. The agent builder defines which parameters are configurable. The customer sets the values. Policy files are YAML, version-controlled, and validated at load time. Invalid policies fail loudly on startup, not silently at runtime.
+
+
+# Customer-configured policy file
+	# Stored in agent builder's system, scoped per customer_id
+	 
+	version: 1
+	agent_role: billing-agent
+	customer_id: acme-corp
+	policy_owner: sarah@acme.com
+	 
+	rules:
+	  - tool: issue_refund
+	    allow:
+	      - amount_usd: { lte: 200 }
+	    escalate:
+	      - amount_usd: { gt: 200, lte: 2000 }
+	    deny:
+	      - amount_usd: { gt: 2000 }
+	 
+	  - tool: send_email
+	    allow:
+	      - recipient_domain: { in: [acme.com, trusted-vendor.com] }
+	    deny:
+	      - recipient_domain: { not_in: [acme.com, trusted-vendor.com] }
+	 
+	  - tool: update_crm
+	    allow: always
+	 
+	  - tool: deploy
+	    deny: always
+	 
+	defaults:
+	  unmatched_tool: deny          # deny anything not listed
+	  unmatched_param: escalate     # escalate on unexpected params
+	 
+	notifications:
+	  escalation_webhook: https://hooks.acme.com/aegis-escalations
+	  escalation_timeout_minutes: 30
+	
+
+3.2 Rule Evaluation Order
+Rules are evaluated top-to-bottom within a tool definition. First match wins. The full evaluation sequence for any tool call is:
+
+
+1. Check if the tool is listed in the policy. If not, apply defaults.unmatched_tool.
+2. Evaluate deny conditions top-to-bottom. First match blocks immediately. No further evaluation.
+3. Evaluate escalate conditions. First match pauses execution and routes to human.
+4. Evaluate allow conditions. First match permits execution.
+5. If no allow condition matches, apply defaults.unmatched_param.
+
+
+3.3 Condition Operators
+
+
+Operator
+	Meaning
+	Example
+	eq / neq
+	Equality or not equal
+	status: { eq: draft }
+	lt / lte
+	Less than or less-or-equal
+	amount: { lte: 500 }
+	gt / gte
+	Greater than or greater-or-equal
+	amount: { gt: 100 }
+	in / not_in
+	Value in or not in a list
+	domain: { in: [acme.com] }
+	regex
+	Regex match on a string parameter
+	path: { regex: ^/tmp/ }
+	always
+	Unconditional match
+	allow: always
+	
+
+
+
+4. SDK Interface
+4.1 Installation
+pip install aegis-sdk
+	 
+	# With LangChain integration
+	pip install aegis-sdk[langchain]
+	 
+	# With MCP server integration
+	pip install aegis-sdk[mcp]
+	
+
+4.2 aegis.wrap()
+The primary integration point. Accepts tool callables, returns wrapped callables with identical interfaces.
+
+
+def wrap(
+	    tools: list[Callable],
+	    policy: str | dict,           # path to YAML or inline dict
+	    agent_id: str,                # scopes the audit trail
+	    customer_id: str = None,      # if multi-tenant, scopes policy load
+	    on_deny: str = 'raise',       # 'raise' | 'return_error' | 'silent'
+	    on_escalate: str = 'block',   # 'block' | 'notify_and_proceed'
+	    audit_sink: AuditSink = None, # where to write audit records
+	    obs_sink: ObsSink = None,     # where to forward observability events
+	) -> list[Callable]
+	
+
+4.3 MCP Server Integration
+For MCP server authors, Aegis provides a wrapper for MCP tool handlers that intercepts calls before the tool logic executes.
+
+
+from mcp.server import Server
+	import aegis
+	 
+	server = Server('billing-agent')
+	 
+	@server.call_tool()
+	@aegis.mcp_enforce(
+	    policy=aegis.load_customer_policy(customer_id),
+	    agent_id='billing-agent'
+	)
+	async def handle_tool_call(name: str, arguments: dict):
+	    # Aegis evaluates before this body runs
+	    # If denied, raises AegisViolationError before reaching here
+	    ...
+	
+
+4.4 PolicyEngine (Lower-Level API)
+For teams that want to evaluate policies without the wrapper, or integrate into custom dispatch logic.
+
+
+engine = aegis.PolicyEngine(policy='./policies/acme-billing.yaml')
+	 
+	decision = engine.evaluate(
+	    tool_name='issue_refund',
+	    params={'order_id': 'ord_789', 'amount_usd': 340.00}
+	)
+	 
+	# decision.outcome: 'allow' | 'deny' | 'escalate'
+	# decision.matched_rule: the rule that fired
+	# decision.reason: human-readable explanation
+	# decision.policy_version: sha256 of the policy file evaluated
+	
+
+
+
+5. Multi-Tenant Policy Loading
+Aegis is designed for agent builders serving multiple enterprise customers. Each customer has their own policy. Aegis loads the correct policy at call time based on the customer context.
+
+
+# Agent builder registers customer policies
+	aegis.register_policy_store(backend='s3', bucket='aegis-policies')
+	 
+	# At request time, load policy for this customer
+	tools = aegis.wrap(
+	    tools=raw_tools,
+	    policy=aegis.load_customer_policy(customer_id=session.customer_id),
+	    agent_id='billing-agent',
+	    customer_id=session.customer_id
+	)
+	
+
+5.1 Policy Storage Backends
+Backend
+	Use case
+	Local filesystem
+	Development and single-tenant deployments
+	S3 / GCS / Azure Blob
+	Multi-tenant cloud deployments. Aegis caches with TTL and watches for updates.
+	Aegis Cloud (Phase 2)
+	Hosted policy storage with version history, approval workflows, and customer UI
+	Custom
+	Implement the PolicyStore protocol to load from any source
+	
+
+
+
+6. Audit Trail
+6.1 Audit Record Schema
+Every evaluated tool call produces one structured audit record, written before execution for deny and escalate outcomes, and after for allow outcomes. Records are immutable once written.
+
+
+{
+	  "record_id": "uuid-v4",
+	  "timestamp": "2024-11-15T14:32:01.234Z",
+	  "customer_id": "acme-corp",
+	  "agent_id": "billing-agent",
+	  "session_id": "sess_abc123",
+	  "policy_version": "acme-billing-v3@sha256:abc123",
+	  "tool_name": "issue_refund",
+	  "params": {
+	    "order_id": "ord_789",
+	    "amount_usd": 340.00
+	  },
+	  "outcome": "escalate",
+	  "matched_rule": "issue_refund.escalate[0]",
+	  "reason": "amount_usd 340.00 exceeds auto-approve threshold 200",
+	  "escalation_id": "esc_xyz789",
+	  "resolved_by": "sarah@acme.com",
+	  "resolution": "approved",
+	  "resolution_timestamp": "2024-11-15T14:38:22.001Z",
+	  "execution_result": { "refund_id": "ref_456" },
+	  "latency_ms": 4
+	}
+	
+
+6.2 Audit Sinks
+Aegis ships with built-in sinks and an open protocol for custom ones. The agent builder configures where audit records go. The Aegis Cloud sink (Phase 2) powers the hosted observability dashboard.
+
+
+from aegis.sinks import FileSink, WebhookSink, AegisSink
+	 
+	# Newline-delimited JSON — easy ingestion into any data warehouse
+	sink = FileSink(path='./audit/billing-agent.jsonl', rotate='daily')
+	 
+	# Webhook — POST each record to your own SIEM or analytics pipeline
+	sink = WebhookSink(
+	    url='https://ingest.acme.com/aegis',
+	    headers={'Authorization': 'Bearer TOKEN'},
+	    async_mode=True  # non-blocking, queued
+	)
+	 
+	# Aegis Cloud — powers the hosted dashboard (Phase 2)
+	sink = AegisSink(api_key='ak_live_...')
+	 
+	# Custom — implement the AuditSink protocol
+	class MyDatadogSink(aegis.AuditSink):
+	    def write(self, record: AuditRecord) -> None:
+	        datadog.event(record.to_dict())
+	
+
+
+
+7. Observability Layer
+The observability layer is built on top of the audit trail, not separate from it. Every audit record is an observability event. The difference from generic tracing is that every event carries policy context: which rule fired, what the outcome was, and whether the behavior is consistent with established patterns for this agent and customer.
+
+
+7.1 Observability Events
+In addition to audit records, Aegis emits structured observability events at key lifecycle points. These are designed for ingestion into dashboards, alerting systems, and anomaly detection.
+
+
+Event type
+	When emitted
+	Key fields
+	tool_evaluated
+	Every tool call, every outcome
+	tool, params, outcome, rule, latency_ms
+	escalation_created
+	Escalate outcome
+	escalation_id, tool, reason, expires_at
+	escalation_resolved
+	Human resolves escalation
+	escalation_id, resolved_by, resolution, duration_ms
+	policy_loaded
+	Policy file loaded or reloaded
+	policy_version, customer_id, rule_count
+	session_summary
+	Session ends or times out
+	total_calls, allows, denies, escalations, tools_used
+	anomaly_detected
+	Phase 2, pattern deviation
+	anomaly_type, baseline, observed, severity
+	
+
+7.2 Observability Sinks
+from aegis.obs import ConsoleSink, PrometheusS, AegisDashboardSink
+	 
+	# Console — structured JSON to stdout for local development
+	obs = ConsoleSink()
+	 
+	# Prometheus — expose metrics endpoint for Grafana
+	obs = PrometheusSink(port=9090)
+	 
+	# Aegis Dashboard — hosted observability, Phase 2
+	obs = AegisDashboardSink(api_key='ak_live_...')
+	
+
+7.3 What Policy-Aware Observability Shows
+Generic tracing shows you what happened. Aegis observability shows you what happened and whether it was expected given the policy. The questions it answers that generic tracing cannot:
+* Which rules are firing most frequently for this customer? Are escalation thresholds set correctly?
+* Is this agent's behavior this week consistent with last week for the same customer?
+* Are there tool combinations that always precede a denial? That might signal a misconfigured policy or a model hallucination pattern.
+* Which customers have the most restrictive policies? Which ones are approving the most escalations?
+* What is the p95 latency of policy evaluation across all tool calls?
+
+
+
+
+8. Escalation Flow
+When a tool call matches an escalate condition, Aegis pauses execution, notifies the configured webhook, and waits for human resolution before proceeding. This is the human-in-the-loop mechanism for high-risk or ambiguous actions.
+
+
+  Agent calls issue_refund(amount_usd=340)
+	       |
+	       v
+	  Aegis evaluates -> outcome: escalate
+	       |
+	       |-- writes audit record (outcome=escalate)
+	       |-- fires escalation webhook
+	       |-- blocks execution (default) or continues (notify_and_proceed)
+	       |
+	  Human receives notification
+	       |
+	  Human calls: POST /v1/escalations/{id}/resolve
+	    { "resolution": "approved" }
+	       |
+	  Aegis unblocks
+	       |
+	  Tool executes
+	       |
+	  Audit record updated: resolved_by, resolution, resolution_timestamp
+	
+
+8.1 Escalation Webhook Payload
+{
+	  "type": "escalation_request",
+	  "escalation_id": "esc_xyz789",
+	  "record_id": "uuid-v4",
+	  "customer_id": "acme-corp",
+	  "agent_id": "billing-agent",
+	  "tool_name": "issue_refund",
+	  "params": { "amount_usd": 340, "order_id": "ord_789" },
+	  "reason": "amount_usd 340.00 exceeds auto-approve threshold 200",
+	  "resolve_url": "https://api.aegis.dev/v1/escalations/esc_xyz789/resolve",
+	  "expires_at": "2024-11-15T15:02:01Z"
+	}
+	
+
+
+
+9. Framework Integrations
+9.1 LangChain
+from langchain.agents import initialize_agent
+	from langchain.tools import Tool
+	import aegis
+	 
+	raw_tools = [
+	    Tool(name='issue_refund', func=issue_refund, description='...'),
+	    Tool(name='update_crm', func=update_crm, description='...'),
+	]
+	 
+	tools = aegis.wrap(
+	    tools=raw_tools,
+	    policy=aegis.load_customer_policy(customer_id),
+	    agent_id='billing-agent'
+	)
+	 
+	agent = initialize_agent(tools=tools, llm=llm)
+	
+
+9.2 MCP Server
+from mcp.server import Server
+	from mcp.server.stdio import stdio_server
+	import aegis
+	 
+	server = Server('billing-agent')
+	 
+	@server.list_tools()
+	async def list_tools():
+	    return [issue_refund_tool, update_crm_tool]
+	 
+	@server.call_tool()
+	@aegis.mcp_enforce(
+	    policy_loader=lambda ctx: aegis.load_customer_policy(ctx.customer_id),
+	    agent_id='billing-agent'
+	)
+	async def handle_call(name: str, arguments: dict):
+	    if name == 'issue_refund':
+	        return await issue_refund(**arguments)
+	    ...
+	 
+	async def main():
+	    async with stdio_server() as (r, w):
+	        await server.run(r, w, server.create_initialization_options())
+	
+
+9.3 Raw OpenAI Function Calling
+import aegis
+	 
+	function_map = {
+	    'issue_refund': issue_refund,
+	    'update_crm': update_crm,
+	}
+	 
+	wrapped = aegis.wrap_function_map(
+	    function_map,
+	    policy=aegis.load_customer_policy(customer_id),
+	    agent_id='billing-agent'
+	)
+	 
+	# Call as normal after model response
+	result = wrapped[tool_call.function.name](**json.loads(tool_call.function.arguments))
+	
+
+
+
+10. Error Handling
+10.1 on_deny Behaviors
+
+
+Setting
+	Behavior
+	When to use
+	raise (default)
+	Raises AegisViolationError. Agent framework surfaces as tool execution failure.
+	Production. Fails loudly. Agent cannot proceed as if the action happened.
+	return_error
+	Returns structured error string: AEGIS_DENIED: <reason>. Agent can read and reason about it.
+	When you want the agent to adapt and try something else rather than hard-fail.
+	silent
+	Returns None. Logs denial internally.
+	Never recommended for production. Only for debugging policy rules in isolation.
+	
+
+10.2 Exception Types
+aegis.AegisViolationError      # tool call explicitly denied by policy
+	aegis.AegisPolicyLoadError     # YAML malformed, missing, or invalid schema
+	aegis.AegisEscalationTimeout   # human did not resolve within timeout window
+	aegis.AegisAmbiguityError      # params not evaluable against policy conditions
+	aegis.AegisConfigError         # SDK misconfigured at initialization
+	
+
+
+
+11. Performance
+11.1 Latency Targets
+Operation
+	Target
+	Notes
+	Simple allow/deny evaluation
+	< 2ms
+	In-memory policy, single rule match
+	Complex policy (20+ rules)
+	< 10ms
+	Full rule tree traversal
+	Policy file load from disk (cold)
+	< 50ms
+	Cached after first load per customer
+	Policy load from S3 (cold)
+	< 200ms
+	Cached with configurable TTL
+	Escalation webhook POST
+	< 100ms
+	Async, non-blocking, queued
+	Audit record write (file sink)
+	< 1ms
+	Async, buffered writes
+	
+
+11.2 Caching
+* Policies are cached in memory after first load, keyed by customer_id and policy version hash
+* Cache invalidation is configurable: TTL-based (default 60 seconds) or file-watch-based for local development
+* Hot reload is supported without restarting the agent process
+
+
+
+
+12. Known Gaps in v0.1
+Important
+This section documents limitations to set honest expectations with early customers and inform the Phase 2 roadmap. Do not hide these from enterprise prospects. Being direct about limits builds trust and surfaces the right feedback.
+	
+
+* Stateful limits are not supported. Per-call enforcement is implemented. Session-level rules like total_spend_session > $2000 require a stateful counter layer and ship in Phase 2.
+* The hosted observability dashboard does not exist yet. Phase 1 ships the audit trail sinks and the local console sink. The dashboard is Phase 2.
+* Agent-to-agent delegation is not implemented. When a manager agent spawns a sub-agent, the sub-agent's tool calls are not automatically scoped to the parent's policy. This is Phase 3.
+* Semantic conditions are not supported. Policy conditions evaluate parameter values structurally. Conditions like is this email going to an external domain require parsing the parameter value which is implemented. Conditions like is this message appropriate require LLM evaluation which is not.
+* Policy hot reload uses file mtime polling. Replace with inotify on Linux in v0.2.
+* The customer policy UI does not exist yet. In Phase 1, customers configure policies through YAML files. The self-service UI for enterprise customers to manage their own policies ships in Phase 2.
+
+
+
+
+13. Open Questions
+These need resolution before v0.1 ships to the first customer.
+
+
+6. Should on_deny default to raise or return_error? raise is safer but makes agents fail hard on denied actions. return_error lets the model adapt, which produces better UX but risks the model finding creative workarounds to the denied action. Decision needed before first customer.
+7. What is the right escalation timeout? 30 minutes assumes someone is watching. Enterprise workflows with approval chains may need hours or days. Should this be configurable per rule rather than per policy?
+8. How do we handle policy versioning across a long-running agent session? If a customer updates their policy mid-session, does the running session pick it up immediately or complete under the policy it started with?
+9. Should we ship a policy testing framework in v0.1? aegis test that runs a policy against a set of fixture inputs and shows which rules fire. High value for security team adoption. Low implementation cost. Probably yes.
+
+
+Aegis  ·  Technical Specification  ·  v0.1 Draft  ·  April 2026

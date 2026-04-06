@@ -1,0 +1,33 @@
+version: 1
+agent_role: billing-agent
+customer_id: acme-corp
+policy_owner: sarah@acme.com
+
+rules:
+  - tool: issue_refund
+    allow:
+      - amount_usd: { lte: 200 }
+    escalate:
+      - amount_usd: { gt: 200, lte: 2000 }
+    deny:
+      - amount_usd: { gt: 2000 }
+
+  - tool: send_email
+    allow:
+      - recipient_domain: { in: [acme.com, trusted-vendor.com] }
+    deny:
+      - recipient_domain: { not_in: [acme.com, trusted-vendor.com] }
+
+  - tool: update_crm
+    allow: always
+
+  - tool: deploy
+    deny: always
+
+defaults:
+  unmatched_tool: deny
+  unmatched_param: escalate
+
+notifications:
+  escalation_webhook: https://hooks.acme.com/aegis-escalations
+  escalation_timeout_minutes: 30
