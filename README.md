@@ -1,96 +1,121 @@
 # Aegis SDK
 
-**Policy Enforcement and Observability for Agent Builders**
+**Policy Enforcement and Observability for AI Agent Tool Calls**
 
-Aegis is a Python SDK that agent builders and MCP server authors embed into their products. It wraps tool calls, evaluates them against customer-configurable policies, and produces structured audit records of every action.
+Aegis is a Python SDK and dashboard platform that enables infrastructure-level policy enforcement for AI agent tool calls. It wraps functions, evaluates them against YAML-based policies, and produces structured audit records for every action.
 
 ## Features
 
 - **🛡️ Infrastructure-enforced policy controls** - Enforcement at the tool call layer, not prompt layer
-- **📋 Customer-configurable policies** - YAML-based policies customers can modify without touching code
-- **📊 Policy-aware audit trail** - Structured, immutable records of every tool call evaluation
-- **🔌 Framework-agnostic** - Works with LangChain, CrewAI, MCP servers, or raw function calls
+- **📋 Customer-configurable policies** - YAML-based policies with 8 condition operators
+- **📊 Real-time observability dashboard** - Web UI for monitoring, alerts, and audit trails
+- **🔌 Framework-agnostic** - Works with any Python function or AI framework
 - **🚨 Human-in-the-loop escalation** - High-risk actions pause for human approval
-- **⚡ High performance** - Sub-2ms policy evaluation for simple rules
+- **⚡ High performance** - Batched async ingestion, TimescaleDB time-series storage
+
+## Quick Links
+
+- **[🚀 Quickstart Guide](QUICKSTART.md)** - Run the dashboard locally, set up database
+- **[📚 SDK Developer Guide](SDK_GUIDE.md)** - Complete API reference, patterns, integrations
+- **[📋 Dashboard Summary](DASHBOARD_SUMMARY.md)** - Architecture, features, deployment
+- **[🧪 Test Results](TEST_RESULTS.md)** - 68 tests passing (44 SDK + 24 frontend)
 
 ## Installation
 
+**SDK Only:**
 ```bash
-pip install aegis-sdk
-
-# With optional dependencies
-pip install aegis-sdk[langchain]  # LangChain integration
-pip install aegis-sdk[mcp]        # MCP server integration
-pip install aegis-sdk[s3]         # S3 policy storage
-pip install aegis-sdk[gcs]        # GCS policy storage
+cd aegis-core
+pip install -e .
 ```
+
+**Full Platform (Dashboard + SDK):**
+```bash
+cd aegis-dashboard
+docker-compose up -d
+```
+
+See [QUICKSTART.md](QUICKSTART.md) for detailed setup instructions.
 
 ## Quick Start
 
-### 1. Define your tools
+### 1. Create a Policy
 
-```python
-def issue_refund(order_id: str, amount_usd: float) -> dict:
-    """Issue a refund for the given order."""
-    # Your implementation here
-    return {"refund_id": "ref_123", "amount": amount_usd}
-
-def update_crm(customer_id: str, notes: str) -> dict:
-    """Update CRM with customer notes."""
-    # Your implementation here
-    return {"success": True}
-```
-
-### 2. Create a policy file
-
+`policy.yaml`:
 ```yaml
-# policies/acme-corp.yaml
-version: 1
-customer_id: acme-corp
+version: 1.0
+default_action: deny
 
 rules:
-  - tool: issue_refund
-    allow:
-      - amount_usd: { lte: 200 }
-    escalate:
-      - amount_usd: { gt: 200, lte: 2000 }
-    deny:
-      - amount_usd: { gt: 2000 }
-
-  - tool: update_crm
-    allow: always
-
-defaults:
-  unmatched_tool: deny
-  unmatched_param: escalate
+  - tool: "send_email"
+    action: escalate
+    
+  - tool: "read_file"
+    action: allow
+    conditions:
+      - field: "path"
+        operator: "regex"
+        value: "^/safe/.*"
+  
+  - tool: "delete_file"
+    action: deny
 ```
 
-### 3. Wrap your tools
+### 2. Wrap Your Tools
 
 ```python
-import aegis
+from aegis import PolicyEngine, wrap_tool
 
-# Wrap tools with policy enforcement
-tools = aegis.wrap(
-    tools=[issue_refund, update_crm],
-    policy="./policies/acme-corp.yaml",
-    agent_id="billing-agent",
-    customer_id="acme-corp",
-    audit_sink=aegis.FileSink(path="./audit/billing-agent.jsonl"),
-)
+# Load policy
+engine = PolicyEngine.from_yaml("policy.yaml")
 
-# Use wrapped tools - they have identical interfaces
-wrapped_refund, wrapped_crm = tools
+# Your tool functions
+def send_email(to: str, subject: str, body: str):
+    # Send email logic
+    return f"Email sent to {to}"
 
-# Small refund - allowed
-result = wrapped_refund(order_id="ord_123", amount_usd=100)
+def read_file(path: str):
+    with open(path) as f:
+        return f.read()
 
-# Large refund - denied
-try:
-    result = wrapped_refund(order_id="ord_456", amount_usd=5000)
-except aegis.AegisViolationError as e:
-    print(f"Policy violation: {e}")
+def delete_file(path: str):
+    import os
+    os.remove(path)
+    return f"Deleted {path}"
+
+# Wrap with policy enforcement
+wrapped = wrap_tool({
+    "send_email": send_email,
+    "read_file": read_file,
+    "delete_file": delete_file
+}, engine, on_deny="raise")
+
+# Use wrapped tools
+wrapped["read_file"](path="/safe/file.txt")  # ✅ Allowed
+wrapped["send_email"](to="user@example.com", subject="Hi", body="Hello")  # ⏸️ Escalates
+wrapped["delete_file"](path="/important.txt")  # ❌ Denied
 ```
+
+### 3. View in Dashboard
+
+Send audit records to the dashboard for monitoring:
+
+```python
+import requests
+
+def send_to_dashboard(event):
+    requests.post(
+        "http://localhost:8000/api/v1/ingest/audit",
+        headers={"X-API-Key": "your_api_key"},
+        json=event.to_dict()
+    )
+```
+
+Dashboard provides:
+- Real-time tool call monitoring
+- Policy editor with YAML validation
+- Audit trail with filtering
+- Alert management
+- WebSocket live feed
 
 ## Policy Language
 
@@ -310,13 +335,42 @@ black aegis tests
 mypy aegis
 ```
 
+## Project Structure
+
+```
+aegis-core/
+├── aegis/                   # SDK source code
+│   ├── __init__.py
+│   ├── audit.py            # Audit logging
+│   ├── escalation.py       # Escalation management
+│   ├── events.py           # Event data models
+│   ├── policy_engine.py    # Policy evaluation
+│   └── wrapper.py          # Tool wrapping
+├── tests/                   # SDK tests (44 tests)
+├── examples/                # Usage examples
+├── policies/                # Example policies
+├── aegis-dashboard/         # Full-stack dashboard
+│   ├── backend/            # FastAPI + SQLAlchemy
+│   │   ├── app/
+│   │   ├── alembic/
+│   │   └── tests/          # Backend tests (13 tests)
+│   ├── frontend/           # Next.js + React
+│   │   ├── src/
+│   │   └── tests/          # Frontend tests (24 tests)
+│   └── docker-compose.yml
+└── docs/
+    ├── QUICKSTART.md       # Local setup guide
+    ├── SDK_GUIDE.md        # Developer reference
+    ├── DASHBOARD_SUMMARY.md
+    └── TEST_RESULTS.md
+```
+
 ## Examples
 
-See the `examples/` directory for complete working examples:
-
-- `basic_usage.py` - Simple tool wrapping
-- `langchain_example.py` - LangChain integration
-- `multi_tenant.py` - Multi-customer policy loading
+See `examples/` for complete working examples:
+- `basic_example.py` - Simple policy enforcement
+- `multi_tool_example.py` - Multiple tools with conditions
+- `escalation_example.py` - Human-in-the-loop workflow
 
 ## License
 
@@ -328,5 +382,5 @@ Contributions welcome! Please open an issue or PR.
 
 ## Support
 
-- Documentation: https://docs.aegis.dev
-- Issues: https://github.com/aegis/aegis-sdk/issues
+- Issues: https://github.com/yourorg/aegis-core/issues
+- Documentation: [QUICKSTART.md](QUICKSTART.md), [SDK_GUIDE.md](SDK_GUIDE.md)
