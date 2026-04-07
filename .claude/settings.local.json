@@ -2,7 +2,8 @@
   "permissions": {
     "allow": [
       "Bash(git init:*)",
-      "Bash(python -m venv venv)"
+      "Bash(python -m venv venv)",
+      "Bash(mkdir:*)"
     ]
   }
 }

@@ -4,6 +4,7 @@ import { useQuery } from '@tanstack/react-query'
 import { api } from '@/lib/api'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
+import { LiveFeed } from '@/components/LiveFeed'
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
   LineChart, Line
@@ -174,25 +175,29 @@ export default function DashboardPage() {
           </CardContent>
         </Card>
 
-        {/* Latency Stats */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Policy Evaluation Latency</CardTitle>
-            <CardDescription>Performance metrics</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="grid gap-4 md:grid-cols-2">
-              <div>
-                <p className="text-sm text-muted-foreground">Average Latency</p>
-                <p className="text-2xl font-bold">{metrics?.latency.avg.toFixed(2)}ms</p>
+        {/* Latency Stats and Live Feed */}
+        <div className="grid gap-4 md:grid-cols-2">
+          <Card>
+            <CardHeader>
+              <CardTitle>Policy Evaluation Latency</CardTitle>
+              <CardDescription>Performance metrics</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="grid gap-4 md:grid-cols-2">
+                <div>
+                  <p className="text-sm text-muted-foreground">Average Latency</p>
+                  <p className="text-2xl font-bold">{metrics?.latency.avg.toFixed(2)}ms</p>
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground">Max Latency</p>
+                  <p className="text-2xl font-bold">{metrics?.latency.max.toFixed(2)}ms</p>
+                </div>
               </div>
-              <div>
-                <p className="text-sm text-muted-foreground">Max Latency</p>
-                <p className="text-2xl font-bold">{metrics?.latency.max.toFixed(2)}ms</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+            </CardContent>
+          </Card>
+
+          <LiveFeed customerId={DEMO_CUSTOMER_ID} maxItems={5} />
+        </div>
       </main>
     </div>
   )

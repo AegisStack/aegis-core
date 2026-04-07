@@ -10,6 +10,7 @@ from .config import get_settings
 from .database import init_db, close_db
 from .redis_client import close_redis
 from .api.v1 import ingest, audit, policies, metrics, escalations
+from .api import websocket
 
 settings = get_settings()
 
@@ -47,6 +48,7 @@ app.include_router(audit.router, prefix="/api/v1", tags=["Audit"])
 app.include_router(policies.router, prefix="/api/v1", tags=["Policies"])
 app.include_router(metrics.router, prefix="/api/v1", tags=["Metrics"])
 app.include_router(escalations.router, prefix="/api/v1", tags=["Escalations"])
+app.include_router(websocket.router, tags=["WebSocket"])
 
 
 @app.get("/")

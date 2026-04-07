@@ -74,6 +74,15 @@ async def ingest_audit_records(
     db.add_all(audit_records)
     await db.commit()
 
+    # Broadcast to WebSocket connections
+    from ...api.websocket import get_connection_manager
+    manager = get_connection_manager()
+    for record in records:
+        await manager.broadcast_audit_record(
+            customer.customer_id,
+            record.dict()
+        )
+
     return {
         "status": "accepted",
         "records_received": len(records),
