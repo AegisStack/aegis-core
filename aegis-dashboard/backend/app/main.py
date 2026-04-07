@@ -9,7 +9,7 @@ from contextlib import asynccontextmanager
 from .config import get_settings
 from .database import init_db, close_db
 from .redis_client import close_redis
-from .api.v1 import ingest, audit, policies, metrics, escalations
+from .api.v1 import ingest, audit, policies, metrics, escalations, auth
 from .api import websocket
 
 settings = get_settings()
@@ -43,6 +43,7 @@ app.add_middleware(
 )
 
 # Include routers
+app.include_router(auth.router, prefix="/api/v1", tags=["Authentication"])
 app.include_router(ingest.router, prefix="/api/v1", tags=["Ingestion"])
 app.include_router(audit.router, prefix="/api/v1", tags=["Audit"])
 app.include_router(policies.router, prefix="/api/v1", tags=["Policies"])

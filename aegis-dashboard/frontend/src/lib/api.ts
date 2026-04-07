@@ -3,6 +3,7 @@
  */
 
 import axios, { AxiosInstance } from 'axios'
+import { getAccessToken } from './auth'
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
 
@@ -12,6 +13,15 @@ const apiClient: AxiosInstance = axios.create({
   headers: {
     'Content-Type': 'application/json',
   },
+})
+
+// Add auth interceptor
+apiClient.interceptors.request.use((config) => {
+  const token = getAccessToken()
+  if (token) {
+    config.headers.Authorization = `Bearer ${token}`
+  }
+  return config
 })
 
 // Types
@@ -85,6 +95,34 @@ export interface Escalation {
 
 // API functions
 export const api = {
+  // Authentication
+  async register(data: {
+    email: string
+    password: string
+    full_name: string
+    customer_id: string
+  }): Promise<{ access_token: string; token_type: string; user: any }> {
+    const response = await apiClient.post('/api/v1/auth/register', data)
+    return response.data
+  },
+
+  async login(data: {
+    email: string
+    password: string
+  }): Promise<{ access_token: string; token_type: string; user: any }> {
+    const response = await apiClient.post('/api/v1/auth/login', data)
+    return response.data
+  },
+
+  async logout(): Promise<void> {
+    await apiClient.post('/api/v1/auth/logout')
+  },
+
+  async getCurrentUser(): Promise<any> {
+    const response = await apiClient.get('/api/v1/auth/me')
+    return response.data
+  },
+
   // Audit records
   async getAuditRecords(params: {
     customer_id?: string
