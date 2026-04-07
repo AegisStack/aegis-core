@@ -37,7 +37,7 @@ from .exceptions import (
 from .audit import AuditRecord, create_audit_record, AuditWriter
 
 # Sinks
-from .sinks import AuditSink, FileSink, WebhookSink
+from .sinks import AuditSink, FileSink, WebhookSink, AegisDashboardSink
 
 # Observability
 from .obs import (
@@ -88,6 +88,7 @@ __all__ = [
     "AuditSink",
     "FileSink",
     "WebhookSink",
+    "AegisDashboardSink",
     # Observability
     "ObservabilityEvent",
     "ToolEvaluatedEvent",
