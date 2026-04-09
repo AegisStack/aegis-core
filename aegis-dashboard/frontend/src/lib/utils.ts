@@ -6,7 +6,15 @@ export function cn(...inputs: ClassValue[]) {
 }
 
 export function formatDate(date: string | Date): string {
-  return new Date(date).toLocaleString()
+  return new Date(date).toLocaleString('en-US', {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    hour12: false,
+  })
 }
 
 export function formatRelativeTime(date: string | Date): string {

@@ -77,11 +77,15 @@ class AegisDashboardSink:
 
                 if len(batch) >= self.batch_size:
                     self._send_batch(batch)
+                    for _ in batch:
+                        self._queue.task_done()
                     batch = []
 
             except queue.Empty:
                 if batch:
                     self._send_batch(batch)
+                    for _ in batch:
+                        self._queue.task_done()
                     batch = []
 
     def _send_batch(self, records: List[AuditRecord]) -> None:

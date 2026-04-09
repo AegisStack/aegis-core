@@ -4,7 +4,7 @@ Policies API - CRUD operations for policies.
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, and_, desc
+from sqlalchemy import select, and_, desc, func
 from pydantic import BaseModel
 from typing import List, Optional
 import hashlib
@@ -26,6 +26,14 @@ class PolicyCreate(BaseModel):
     created_by: Optional[str] = None
 
 
+class PolicyAssignRequest(BaseModel):
+    """Schema for assigning a policy to another agent."""
+
+    target_agent_id: str
+    description: Optional[str] = None
+    created_by: Optional[str] = None
+
+
 class PolicyResponse(BaseModel):
     """Schema for policy responses."""
 
@@ -33,6 +41,7 @@ class PolicyResponse(BaseModel):
     customer_id: str
     agent_id: str
     policy_yaml: str
+    policy_hash: str
     version: int
     is_active: bool
     created_at: str
@@ -60,6 +69,21 @@ def validate_policy_yaml(policy_yaml: str) -> dict:
         raise HTTPException(status_code=400, detail="Policy missing 'rules' field")
 
     return policy
+
+
+@router.get("/agents", response_model=List[str])
+async def list_agents(
+    customer_id: str = Query(...),
+    db: AsyncSession = Depends(get_db),
+):
+    """List all unique agent IDs that have policies for a customer."""
+    result = await db.execute(
+        select(Policy.agent_id)
+        .where(Policy.customer_id == customer_id)
+        .distinct()
+        .order_by(Policy.agent_id)
+    )
+    return [row[0] for row in result.fetchall()]
 
 
 @router.get("/policies", response_model=List[PolicyResponse])
@@ -105,13 +129,10 @@ async def create_policy(policy_data: PolicyCreate, db: AsyncSession = Depends(ge
 
     Validates YAML, deactivates previous versions, and creates new active policy.
     """
-    # Validate YAML
     validate_policy_yaml(policy_data.policy_yaml)
 
-    # Compute hash
     policy_hash = hashlib.sha256(policy_data.policy_yaml.encode()).hexdigest()
 
-    # Check if identical policy already exists
     existing_query = select(Policy).where(
         and_(
             Policy.customer_id == policy_data.customer_id,
@@ -124,20 +145,15 @@ async def create_policy(policy_data: PolicyCreate, db: AsyncSession = Depends(ge
     if existing_result.scalar_one_or_none():
         raise HTTPException(status_code=409, detail="Identical policy already exists")
 
-    # Get current version number
-    version_query = (
-        select(func.max(Policy.version))
-        .where(
-            and_(
-                Policy.customer_id == policy_data.customer_id,
-                Policy.agent_id == policy_data.agent_id,
-            )
+    version_query = select(func.max(Policy.version)).where(
+        and_(
+            Policy.customer_id == policy_data.customer_id,
+            Policy.agent_id == policy_data.agent_id,
         )
     )
     version_result = await db.execute(version_query)
     current_version = version_result.scalar() or 0
 
-    # Deactivate all previous versions
     deactivate_query = (
         select(Policy)
         .where(
@@ -152,7 +168,6 @@ async def create_policy(policy_data: PolicyCreate, db: AsyncSession = Depends(ge
     for old_policy in deactivate_result.scalars():
         old_policy.is_active = False
 
-    # Create new policy
     new_policy = Policy(
         customer_id=policy_data.customer_id,
         agent_id=policy_data.agent_id,
@@ -171,17 +186,90 @@ async def create_policy(policy_data: PolicyCreate, db: AsyncSession = Depends(ge
     return PolicyResponse(**new_policy.to_dict())
 
 
+@router.post("/policies/{policy_id}/assign", response_model=PolicyResponse, status_code=201)
+async def assign_policy(
+    policy_id: str,
+    assign_data: PolicyAssignRequest,
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Assign (copy) a policy to a different agent.
+
+    Creates a new active policy version for the target agent using the source
+    policy's YAML. Deactivates any existing active policy for the target agent.
+    """
+    source_result = await db.execute(select(Policy).where(Policy.policy_id == policy_id))
+    source_policy = source_result.scalar_one_or_none()
+
+    if not source_policy:
+        raise HTTPException(status_code=404, detail="Policy not found")
+
+    if assign_data.target_agent_id == source_policy.agent_id:
+        raise HTTPException(status_code=400, detail="Target agent must differ from source agent")
+
+    existing_query = select(Policy).where(
+        and_(
+            Policy.customer_id == source_policy.customer_id,
+            Policy.agent_id == assign_data.target_agent_id,
+            Policy.policy_hash == source_policy.policy_hash,
+            Policy.is_active == True,
+        )
+    )
+    existing_result = await db.execute(existing_query)
+    if existing_result.scalar_one_or_none():
+        raise HTTPException(
+            status_code=409,
+            detail="Identical policy is already active for the target agent",
+        )
+
+    version_query = select(func.max(Policy.version)).where(
+        and_(
+            Policy.customer_id == source_policy.customer_id,
+            Policy.agent_id == assign_data.target_agent_id,
+        )
+    )
+    version_result = await db.execute(version_query)
+    current_version = version_result.scalar() or 0
+
+    deactivate_query = select(Policy).where(
+        and_(
+            Policy.customer_id == source_policy.customer_id,
+            Policy.agent_id == assign_data.target_agent_id,
+            Policy.is_active == True,
+        )
+    )
+    deactivate_result = await db.execute(deactivate_query)
+    for old_policy in deactivate_result.scalars():
+        old_policy.is_active = False
+
+    new_policy = Policy(
+        customer_id=source_policy.customer_id,
+        agent_id=assign_data.target_agent_id,
+        policy_yaml=source_policy.policy_yaml,
+        policy_hash=source_policy.policy_hash,
+        version=current_version + 1,
+        is_active=True,
+        created_by=assign_data.created_by,
+        description=assign_data.description
+        or f"Assigned from {source_policy.agent_id} v{source_policy.version}",
+    )
+
+    db.add(new_policy)
+    await db.commit()
+    await db.refresh(new_policy)
+
+    return PolicyResponse(**new_policy.to_dict())
+
+
 @router.post("/policies/{policy_id}/activate", response_model=PolicyResponse)
 async def activate_policy(policy_id: str, db: AsyncSession = Depends(get_db)):
     """Activate a specific policy version (rollback)."""
-    # Get the policy
     result = await db.execute(select(Policy).where(Policy.policy_id == policy_id))
     policy = result.scalar_one_or_none()
 
     if not policy:
         raise HTTPException(status_code=404, detail="Policy not found")
 
-    # Deactivate all other versions
     deactivate_query = select(Policy).where(
         and_(
             Policy.customer_id == policy.customer_id,
@@ -193,7 +281,6 @@ async def activate_policy(policy_id: str, db: AsyncSession = Depends(get_db)):
     for old_policy in deactivate_result.scalars():
         old_policy.is_active = False
 
-    # Activate this policy
     policy.is_active = True
 
     await db.commit()

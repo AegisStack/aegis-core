@@ -1,30 +1,55 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
+import { useSearchParams } from 'next/navigation'
 import { useQuery } from '@tanstack/react-query'
 import { api, type AuditRecord } from '@/lib/api'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { formatDate, formatRelativeTime } from '@/lib/utils'
-
-const DEMO_CUSTOMER_ID = 'acme-corp'
+import { useCustomer } from '@/app/providers'
 
 export default function AuditLogPage() {
+  const { customerId } = useCustomer()
+  const searchParams = useSearchParams()
+
   const [filters, setFilters] = useState({
     agent_id: '',
     tool_name: '',
     outcome: '',
+    start_time: '',
+    end_time: '',
   })
   const [selectedRecord, setSelectedRecord] = useState<AuditRecord | null>(null)
 
+  useEffect(() => {
+    const outcome = searchParams.get('outcome') || ''
+    const start_time = searchParams.get('start_time') || ''
+    const end_time = searchParams.get('end_time') || ''
+    const agent_id = searchParams.get('agent_id') || ''
+    const tool_name = searchParams.get('tool_name') || ''
+    if (outcome || start_time || end_time || agent_id || tool_name) {
+      setFilters((prev) => ({
+        ...prev,
+        outcome: outcome || prev.outcome,
+        start_time: start_time || prev.start_time,
+        end_time: end_time || prev.end_time,
+        agent_id: agent_id || prev.agent_id,
+        tool_name: tool_name || prev.tool_name,
+      }))
+    }
+  }, [searchParams])
+
   const { data: records, isLoading } = useQuery({
-    queryKey: ['audit-records', DEMO_CUSTOMER_ID, filters],
+    queryKey: ['audit-records', customerId, filters],
     queryFn: () =>
       api.getAuditRecords({
-        customer_id: DEMO_CUSTOMER_ID,
+        customer_id: customerId,
         agent_id: filters.agent_id || undefined,
         tool_name: filters.tool_name || undefined,
         outcome: filters.outcome || undefined,
+        start_time: filters.start_time || undefined,
+        end_time: filters.end_time || undefined,
         limit: 100,
       }),
   })
@@ -44,15 +69,6 @@ export default function AuditLogPage() {
 
   return (
     <div className="min-h-screen bg-background">
-      <header className="border-b">
-        <div className="container mx-auto px-4 py-4">
-          <h1 className="text-2xl font-bold">Audit Log Explorer</h1>
-          <p className="text-sm text-muted-foreground">
-            Query and analyze policy enforcement events
-          </p>
-        </div>
-      </header>
-
       <main className="container mx-auto px-4 py-8">
         <div className="grid gap-6 lg:grid-cols-3">
           {/* Filters */}
@@ -98,9 +114,21 @@ export default function AuditLogPage() {
                 </select>
               </div>
 
+              {(filters.start_time || filters.end_time) && (
+                <div className="p-3 bg-muted rounded-md space-y-1">
+                  <p className="text-xs font-medium text-muted-foreground">Time Window</p>
+                  {filters.start_time && (
+                    <p className="text-xs">From: {formatDate(filters.start_time)}</p>
+                  )}
+                  {filters.end_time && (
+                    <p className="text-xs">To: {formatDate(filters.end_time)}</p>
+                  )}
+                </div>
+              )}
+
               <button
                 className="w-full px-4 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90"
-                onClick={() => setFilters({ agent_id: '', tool_name: '', outcome: '' })}
+                onClick={() => setFilters({ agent_id: '', tool_name: '', outcome: '', start_time: '', end_time: '' })}
               >
                 Clear Filters
               </button>

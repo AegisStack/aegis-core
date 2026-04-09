@@ -71,11 +71,28 @@ export interface Policy {
   customer_id: string
   agent_id: string
   policy_yaml: string
+  policy_hash: string
   version: number
   is_active: boolean
   created_at: string
   created_by?: string
   description?: string
+}
+
+export interface TimeseriesBucket {
+  time: string
+  total: number
+  allows: number
+  denies: number
+  escalations: number
+  avg_latency: number
+  p95_latency: number
+  p99_latency: number
+}
+
+export interface TimeseriesResponse {
+  interval: string
+  buckets: TimeseriesBucket[]
 }
 
 export interface Escalation {
@@ -152,6 +169,60 @@ export const api = {
     return response.data
   },
 
+  // Explore (drill-down detail)
+  async getExplore(params: {
+    customer_id: string
+    start: string
+    end: string
+    outcome?: string
+    agent_id?: string
+  }): Promise<{
+    window: { start: string; end: string; outcome_filter: string | null }
+    summary: {
+      total: number
+      allows: number
+      denies: number
+      escalations: number
+      avg_latency: number
+      p95_latency: number
+      p99_latency: number
+    }
+    agents: Array<{
+      agent_id: string
+      total: number
+      allows: number
+      denies: number
+      escalations: number
+      deny_rate: number
+      avg_latency: number
+    }>
+    tools: Array<{
+      tool_name: string
+      total: number
+      allows: number
+      denies: number
+      escalations: number
+      deny_rate: number
+      avg_latency: number
+    }>
+  }> {
+    const response = await apiClient.get('/api/v1/metrics/explore', { params })
+    return response.data
+  },
+
+  // Timeseries
+  async getTimeseries(params: {
+    customer_id: string
+    start: string
+    end: string
+    interval?: string
+    agent_id?: string
+    tool_name?: string
+  }): Promise<TimeseriesResponse> {
+    const response = await apiClient.get('/api/v1/metrics/timeseries', { params })
+    return response.data
+  },
+
   // Policies
   async getPolicies(params: {
     customer_id: string
@@ -180,6 +251,21 @@ export const api = {
 
   async activatePolicy(policyId: string): Promise<Policy> {
     const response = await apiClient.post(`/api/v1/policies/${policyId}/activate`)
+    return response.data
+  },
+
+  async assignPolicy(
+    policyId: string,
+    data: { target_agent_id: string; description?: string; created_by?: string }
+  ): Promise<Policy> {
+    const response = await apiClient.post(`/api/v1/policies/${policyId}/assign`, data)
+    return response.data
+  },
+
+  async getAgents(customerId: string): Promise<string[]> {
+    const response = await apiClient.get('/api/v1/agents', {
+      params: { customer_id: customerId },
+    })
     return response.data
   },
 

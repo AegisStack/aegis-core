@@ -152,6 +152,143 @@ class S3PolicyStore:
             )
 
 
+class DashboardPolicyStore:
+    """
+    Load policies from the Aegis Dashboard API.
+
+    This is the canonical way to keep the SDK in sync with policies
+    managed through the dashboard UI.  Whenever a policy is created,
+    updated, or rolled back in the dashboard the next call to
+    load_policy() (after the cache TTL expires) will pick up the
+    new active version automatically.
+
+    Usage::
+
+        store = DashboardPolicyStore(
+            base_url="http://localhost:8000",
+            api_key="ak_your_key",
+            agent_id="billing-agent",
+        )
+        tools = aegis.wrap(
+            tools=[...],
+            policy=store.load_policy("acme-corp"),
+            agent_id="billing-agent",
+            customer_id="acme-corp",
+        )
+
+    Or via register_policy_store()::
+
+        aegis.register_policy_store(
+            backend="dashboard",
+            base_url="http://localhost:8000",
+            api_key="ak_your_key",
+            agent_id="billing-agent",
+        )
+    """
+
+    def __init__(
+        self,
+        base_url: str = "http://localhost:8000",
+        api_key: str = "",
+        agent_id: str = "",
+        timeout: int = 10,
+    ):
+        """
+        Initialize Dashboard policy store.
+
+        Args:
+            base_url: Base URL of the Aegis Dashboard API
+            api_key:  API key (``X-API-Key`` header)
+            agent_id: Agent ID whose active policy should be loaded.
+                      Must be provided — policies are scoped per agent.
+            timeout:  HTTP request timeout in seconds
+        """
+        self.base_url = base_url.rstrip("/")
+        self.api_key = api_key
+        self.agent_id = agent_id
+        self.timeout = timeout
+
+    def load_policy(self, customer_id: str) -> Dict[str, Any]:
+        """
+        Fetch the active policy for *customer_id* + *agent_id* from the
+        dashboard and return it as a parsed dictionary.
+
+        Args:
+            customer_id: Customer identifier
+
+        Returns:
+            Parsed policy dictionary
+
+        Raises:
+            AegisPolicyLoadError: If the policy cannot be fetched or parsed
+        """
+        try:
+            import requests as _requests
+        except ImportError:
+            raise AegisPolicyLoadError(
+                "requests library is required for DashboardPolicyStore. "
+                "Install with: pip install requests"
+            )
+
+        if not self.agent_id:
+            raise AegisPolicyLoadError(
+                "DashboardPolicyStore requires agent_id to be set",
+                self.base_url,
+            )
+
+        url = f"{self.base_url}/api/v1/policies"
+        try:
+            response = _requests.get(
+                url,
+                params={
+                    "customer_id": customer_id,
+                    "agent_id": self.agent_id,
+                    "include_inactive": "false",
+                },
+                headers={"X-API-Key": self.api_key},
+                timeout=self.timeout,
+            )
+            response.raise_for_status()
+            policies = response.json()
+        except Exception as e:
+            raise AegisPolicyLoadError(
+                f"Error fetching policy from dashboard: {e}",
+                url,
+            )
+
+        if not policies:
+            raise AegisPolicyLoadError(
+                f"No active policy found in dashboard for customer='{customer_id}' "
+                f"agent='{self.agent_id}'. Create one via the Policies page.",
+                url,
+            )
+
+        # API returns most-recent first; take the active one
+        active_policy_record = policies[0]
+        policy_yaml = active_policy_record.get("policy_yaml", "")
+        if not policy_yaml:
+            raise AegisPolicyLoadError(
+                "Dashboard returned a policy record with empty policy_yaml",
+                url,
+            )
+
+        try:
+            policy = yaml.safe_load(policy_yaml)
+        except yaml.YAMLError as e:
+            raise AegisPolicyLoadError(
+                f"Invalid YAML in dashboard policy: {e}",
+                url,
+            )
+
+        if not isinstance(policy, dict):
+            raise AegisPolicyLoadError(
+                "Policy must be a YAML dictionary",
+                url,
+            )
+
+        return policy
+
+
 class GCSPolicyStore:
     """Load policies from Google Cloud Storage."""
 
@@ -393,6 +530,19 @@ def register_policy_store(
             raise ValueError("GCS backend requires 'bucket' parameter")
         prefix = kwargs.get("prefix", "policies/")
         store = GCSPolicyStore(bucket=bucket, prefix=prefix)
+    elif backend == "dashboard":
+        base_url = kwargs.get("base_url", "http://localhost:8000")
+        api_key = kwargs.get("api_key", "")
+        agent_id = kwargs.get("agent_id", "")
+        if not agent_id:
+            raise ValueError("Dashboard backend requires 'agent_id' parameter")
+        timeout = kwargs.get("timeout", 10)
+        store = DashboardPolicyStore(
+            base_url=base_url,
+            api_key=api_key,
+            agent_id=agent_id,
+            timeout=timeout,
+        )
     else:
         raise ValueError(f"Unknown backend: {backend}")
 

@@ -10,7 +10,7 @@ services:
       POSTGRES_PASSWORD: aegis
       POSTGRES_DB: aegis_dashboard
     ports:
-      - "5432:5432"
+      - "5433:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
       - ./init.sql:/docker-entrypoint-initdb.d/init.sql
@@ -45,7 +45,7 @@ services:
       - REDIS_URL=redis://redis:6379/0
       - SECRET_KEY=dev-secret-key-change-in-production
       - DEBUG=true
-      - CORS_ORIGINS=["http://localhost:3000"]
+      - CORS_ORIGINS=["http://localhost:3003"]
     ports:
       - "8000:8000"
     depends_on:

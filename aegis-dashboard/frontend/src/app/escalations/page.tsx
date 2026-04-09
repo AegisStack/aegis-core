@@ -6,9 +6,7 @@ import { api, type Escalation } from '@/lib/api'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { formatDate, formatRelativeTime } from '@/lib/utils'
-
-const DEMO_CUSTOMER_ID = 'acme-corp'
-const DEMO_USER_EMAIL = 'operator@acme-corp.com'
+import { useCustomer } from '@/app/providers'
 
 function getTimeRemaining(expiresAt: string): string {
   const now = new Date()
@@ -128,14 +126,15 @@ function EscalationCard({ escalation, onResolve }: {
 }
 
 export default function EscalationsPage() {
+  const { customerId } = useCustomer()
   const [statusFilter, setStatusFilter] = useState<string>('pending')
   const queryClient = useQueryClient()
 
   const { data: escalations, isLoading } = useQuery({
-    queryKey: ['escalations', DEMO_CUSTOMER_ID, statusFilter],
+    queryKey: ['escalations', customerId, statusFilter],
     queryFn: () =>
       api.getEscalations({
-        customer_id: DEMO_CUSTOMER_ID,
+        customer_id: customerId,
         status: statusFilter,
       }),
     refetchInterval: statusFilter === 'pending' ? 5000 : false, // Refresh pending every 5s
@@ -145,7 +144,7 @@ export default function EscalationsPage() {
     mutationFn: ({ id, resolution }: { id: string; resolution: 'approved' | 'denied' }) =>
       api.resolveEscalation(id, {
         resolution,
-        resolved_by: DEMO_USER_EMAIL,
+        resolved_by: `operator@${customerId}`,
       }),
     onSuccess: () => {
       // Invalidate and refetch
@@ -161,24 +160,6 @@ export default function EscalationsPage() {
 
   return (
     <div className="min-h-screen bg-background">
-      <header className="border-b">
-        <div className="container mx-auto px-4 py-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <h1 className="text-2xl font-bold">Escalation Inbox</h1>
-              <p className="text-sm text-muted-foreground">
-                Review and approve high-risk tool calls
-              </p>
-            </div>
-            {pendingCount > 0 && (
-              <Badge variant="warning" className="text-lg px-4 py-2">
-                {pendingCount} pending
-              </Badge>
-            )}
-          </div>
-        </div>
-      </header>
-
       <main className="container mx-auto px-4 py-8">
         {/* Status Filter */}
         <div className="mb-6 flex space-x-2">

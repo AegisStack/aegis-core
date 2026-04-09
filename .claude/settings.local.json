@@ -3,7 +3,36 @@
     "allow": [
       "Bash(git init:*)",
       "Bash(python -m venv venv)",
-      "Bash(mkdir:*)"
+      "Bash(mkdir:*)",
+      "Bash(npm test:*)",
+      "Bash(npm install:*)",
+      "Bash(python -m pytest tests/ -v)",
+      "Bash(python -m pytest tests/ -v --no-cov)",
+      "Bash(python -m pytest tests/ -v -o addopts=\"\")",
+      "Bash(pip install:*)",
+      "Bash(rm -rf dist/ build/ *.egg-info)",
+      "Bash(python -m build)",
+      "Bash(docker-compose up:*)",
+      "Bash(docker --version)",
+      "Bash(powershell.exe -Command \"Start-Process 'C:\\\\Program Files\\\\Docker\\\\Docker\\\\Docker Desktop.exe'\")",
+      "Bash(python init_db.py)",
+      "Bash(docker exec:*)",
+      "Bash(docker-compose build:*)",
+      "Bash(docker-compose ps:*)",
+      "Bash(curl -s http://localhost:8000/docs)",
+      "Bash(npm run:*)",
+      "Bash(curl -s http://localhost:3000)",
+      "Bash(pkill -f \"next dev\")",
+      "Bash(docker-compose restart:*)",
+      "Bash(tasklist)",
+      "Bash(findstr node.exe)",
+      "Bash(netstat -ano)",
+      "Bash(findstr \":3000\")",
+      "Bash(findstr \"LISTENING\")",
+      "Bash(curl -s http://localhost:3001)",
+      "Bash(findstr \":3001\")",
+      "Bash(curl -s http://localhost:3003)",
+      "Bash(findstr \":3003\")"
     ]
   }
 }

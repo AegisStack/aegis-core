@@ -6,6 +6,7 @@ from .policy_loader import (
     FilesystemPolicyStore,
     S3PolicyStore,
     GCSPolicyStore,
+    DashboardPolicyStore,
     register_policy_store,
     load_customer_policy,
 )
@@ -20,6 +21,7 @@ __all__ = [
     "FilesystemPolicyStore",
     "S3PolicyStore",
     "GCSPolicyStore",
+    "DashboardPolicyStore",
     "register_policy_store",
     "load_customer_policy",
     "EscalationManager",
