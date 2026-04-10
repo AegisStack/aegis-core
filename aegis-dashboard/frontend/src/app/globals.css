@@ -57,3 +57,10 @@
     @apply bg-background text-foreground;
   }
 }
+
+/* Force crosshair cursor on all Recharts SVG content inside chart wrappers */
+.chart-crosshair,
+.chart-crosshair svg,
+.chart-crosshair svg * {
+  cursor: crosshair !important;
+}

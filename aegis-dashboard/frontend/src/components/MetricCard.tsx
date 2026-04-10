@@ -59,12 +59,17 @@ export function MetricCard({
           <div className="h-10">
             <ResponsiveContainer width="100%" height="100%">
               <AreaChart data={data}>
+                <defs>
+                  <linearGradient id={`spark-${sparklineKey}`} x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor={color.includes('green') ? '#1DB954' : color.includes('red') ? '#E5473B' : color.includes('yellow') ? '#F5A623' : '#4B87F5'} stopOpacity={0.3} />
+                    <stop offset="95%" stopColor={color.includes('green') ? '#1DB954' : color.includes('red') ? '#E5473B' : color.includes('yellow') ? '#F5A623' : '#4B87F5'} stopOpacity={0} />
+                  </linearGradient>
+                </defs>
                 <Area
                   type="monotone"
                   dataKey="v"
-                  stroke={color.includes('green') ? '#22c55e' : color.includes('red') ? '#ef4444' : color.includes('yellow') ? '#f59e0b' : '#3b82f6'}
-                  fill={color.includes('green') ? '#22c55e' : color.includes('red') ? '#ef4444' : color.includes('yellow') ? '#f59e0b' : '#3b82f6'}
-                  fillOpacity={0.2}
+                  stroke={color.includes('green') ? '#1DB954' : color.includes('red') ? '#E5473B' : color.includes('yellow') ? '#F5A623' : '#4B87F5'}
+                  fill={`url(#spark-${sparklineKey})`}
                   strokeWidth={1.5}
                   dot={false}
                   isAnimationActive={false}

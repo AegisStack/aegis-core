@@ -33,7 +33,7 @@ export default function DashboardPage() {
     queryFn: () => api.getMetricsSummary({ customer_id: customerId, period: '7d' }),
   })
 
-  const { data: timeseries } = useQuery({
+  const { data: timeseries, isLoading: timeseriesLoading } = useQuery({
     queryKey: ['timeseries', customerId, timeRange.start, timeRange.end, timeRange.interval],
     queryFn: () =>
       api.getTimeseries({
@@ -115,100 +115,118 @@ export default function DashboardPage() {
 
         {/* Time-Series Charts */}
         <div className="grid gap-4 md:grid-cols-1 lg:grid-cols-2">
-          <ThroughputChart data={buckets} interval={timeRange.interval} rangeStart={timeRange.start} rangeEnd={timeRange.end} />
-          <LatencyChart data={buckets} interval={timeRange.interval} rangeStart={timeRange.start} rangeEnd={timeRange.end} />
+          <ThroughputChart
+            data={buckets}
+            interval={timeRange.interval}
+            rangeStart={timeRange.start}
+            rangeEnd={timeRange.end}
+            isLoading={timeseriesLoading}
+            onRangeSelect={(start, end, interval) =>
+              setTimeRange({ start, end, interval, label: 'custom' })
+            }
+          />
+          <LatencyChart
+            data={buckets}
+            interval={timeRange.interval}
+            rangeStart={timeRange.start}
+            rangeEnd={timeRange.end}
+            isLoading={timeseriesLoading}
+            onRangeSelect={(start, end, interval) =>
+              setTimeRange({ start, end, interval, label: 'custom' })
+            }
+          />
         </div>
 
-        {/* Existing Charts — clickable */}
+        {/* Outcome Distribution + Top Tools — Datadog style */}
         <div className="grid gap-4 md:grid-cols-2">
-          <Card>
-            <CardHeader>
-              <CardTitle>Outcome Distribution</CardTitle>
-              <CardDescription>Policy enforcement outcomes (last 7 days) — click a bar to explore</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <ResponsiveContainer width="100%" height={300}>
-                <BarChart
-                  data={outcomeData}
-                  style={{ cursor: 'pointer' }}
-                  onClick={(e) => {
-                    const outcome = e?.activePayload?.[0]?.payload?.outcome
-                    if (!outcome) return
-                    const params = new URLSearchParams({
-                      start: timeRange.start,
-                      end: timeRange.end,
-                      outcome,
-                    })
-                    router.push(`/explore?${params.toString()}`)
+          {/* Outcome Distribution */}
+          <div style={{ background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 8, padding: '16px 16px 8px', cursor: 'pointer' }}
+            onClick={(e) => {
+              const target = e.target as HTMLElement
+              if (target.tagName === 'BUTTON') return
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 8 }}>
+              <div>
+                <p style={{ fontSize: 13, fontWeight: 600, margin: 0 }}>Outcome Distribution</p>
+                <p style={{ fontSize: 11, color: '#888', margin: '2px 0 0' }}>Last 7 days — click a bar to explore</p>
+              </div>
+            </div>
+            <ResponsiveContainer width="100%" height={220}>
+              <BarChart
+                data={outcomeData}
+                style={{ cursor: 'pointer' }}
+                onClick={(e) => {
+                  const outcome = e?.activePayload?.[0]?.payload?.outcome
+                  if (!outcome) return
+                  router.push(`/explore?${new URLSearchParams({ start: timeRange.start, end: timeRange.end, outcome }).toString()}`)
+                }}
+                barCategoryGap="30%"
+              >
+                <CartesianGrid vertical={false} stroke="var(--border)" strokeOpacity={0.5} />
+                <XAxis dataKey="name" tick={{ fontSize: 11, fill: '#888' }} axisLine={false} tickLine={false} />
+                <YAxis tick={{ fontSize: 11, fill: '#888' }} axisLine={false} tickLine={false} width={30} />
+                <Tooltip
+                  content={({ active, payload }) => {
+                    if (!active || !payload?.length) return null
+                    return (
+                      <div style={{ background: '#1a1a2e', border: '1px solid #2d2d4e', borderRadius: 4, padding: '8px 12px', fontSize: 12, color: '#e0e0e0' }}>
+                        <p style={{ fontWeight: 600, color: '#fff', marginBottom: 2 }}>{payload[0].payload.name}</p>
+                        <p style={{ color: payload[0].payload.fill }}>Count: <strong>{payload[0].value}</strong></p>
+                        <p style={{ color: '#888', marginTop: 4, borderTop: '1px solid #2d2d4e', paddingTop: 4 }}>Click to explore →</p>
+                      </div>
+                    )
                   }}
-                >
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="name" />
-                  <YAxis />
-                  <Tooltip
-                    content={({ active, payload }) => {
-                      if (!active || !payload?.length) return null
-                      return (
-                        <div className="bg-card border rounded-lg p-3 shadow-lg text-sm">
-                          <p className="font-medium">{payload[0].payload.name}: {payload[0].value}</p>
-                          <p className="text-xs text-muted-foreground mt-1">Click to explore →</p>
-                        </div>
-                      )
-                    }}
-                  />
-                  <Bar dataKey="value" radius={[4, 4, 0, 0]}>
-                    {outcomeData.map((entry) => (
-                      <Cell key={entry.name} fill={entry.fill} />
-                    ))}
-                  </Bar>
-                </BarChart>
-              </ResponsiveContainer>
-            </CardContent>
-          </Card>
+                  cursor={{ fill: 'var(--muted)', fillOpacity: 0.3 }}
+                />
+                <Bar dataKey="value" radius={[3, 3, 0, 0]}>
+                  {outcomeData.map((entry) => (
+                    <Cell key={entry.name} fill={entry.fill} />
+                  ))}
+                </Bar>
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
 
-          <Card>
-            <CardHeader>
-              <CardTitle>Top Tools</CardTitle>
-              <CardDescription>Most frequently called tools — click a bar to explore</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <ResponsiveContainer width="100%" height={300}>
-                <BarChart
-                  data={metrics?.top_tools || []}
-                  layout="vertical"
-                  style={{ cursor: 'pointer' }}
-                  onClick={(e) => {
-                    const toolName = e?.activePayload?.[0]?.payload?.tool
-                    if (!toolName) return
-                    const params = new URLSearchParams({
-                      start: timeRange.start,
-                      end: timeRange.end,
-                    })
-                    router.push(`/explore?${params.toString()}`)
+          {/* Top Tools */}
+          <div style={{ background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 8, padding: '16px 16px 8px', cursor: 'pointer' }}>
+            <div style={{ marginBottom: 8 }}>
+              <p style={{ fontSize: 13, fontWeight: 600, margin: 0 }}>Top Tools</p>
+              <p style={{ fontSize: 11, color: '#888', margin: '2px 0 0' }}>Most called tools — click to explore</p>
+            </div>
+            <ResponsiveContainer width="100%" height={220}>
+              <BarChart
+                data={metrics?.top_tools || []}
+                layout="vertical"
+                style={{ cursor: 'pointer' }}
+                barSize={12}
+                onClick={(e) => {
+                  if (!e?.activePayload?.[0]) return
+                  router.push(`/explore?${new URLSearchParams({ start: timeRange.start, end: timeRange.end }).toString()}`)
+                }}
+              >
+                <CartesianGrid horizontal={false} stroke="var(--border)" strokeOpacity={0.5} />
+                <XAxis type="number" tick={{ fontSize: 11, fill: '#888' }} axisLine={false} tickLine={false} />
+                <YAxis dataKey="tool" type="category" width={120} tick={{ fontSize: 11, fill: '#888' }} axisLine={false} tickLine={false} />
+                <Tooltip
+                  content={({ active, payload }) => {
+                    if (!active || !payload?.length) return null
+                    const d = payload[0].payload
+                    return (
+                      <div style={{ background: '#1a1a2e', border: '1px solid #2d2d4e', borderRadius: 4, padding: '8px 12px', fontSize: 12, color: '#e0e0e0' }}>
+                        <p style={{ fontWeight: 600, color: '#fff', marginBottom: 2 }}>{d.tool}</p>
+                        <p style={{ color: '#4B87F5' }}>Calls: <strong>{d.count}</strong></p>
+                        <p style={{ color: '#E5473B' }}>Deny rate: <strong>{(d.deny_rate * 100).toFixed(1)}%</strong></p>
+                        <p style={{ color: '#888', marginTop: 4, borderTop: '1px solid #2d2d4e', paddingTop: 4 }}>Click to explore →</p>
+                      </div>
+                    )
                   }}
-                >
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis type="number" />
-                  <YAxis dataKey="tool" type="category" width={120} tick={{ fontSize: 12 }} />
-                  <Tooltip
-                    content={({ active, payload }) => {
-                      if (!active || !payload?.length) return null
-                      const d = payload[0].payload
-                      return (
-                        <div className="bg-card border rounded-lg p-3 shadow-lg text-sm">
-                          <p className="font-medium">{d.tool}</p>
-                          <p>Calls: {d.count}</p>
-                          <p>Deny rate: {(d.deny_rate * 100).toFixed(1)}%</p>
-                          <p className="text-xs text-muted-foreground mt-1">Click to explore →</p>
-                        </div>
-                      )
-                    }}
-                  />
-                  <Bar dataKey="count" fill="#3b82f6" radius={[0, 4, 4, 0]} />
-                </BarChart>
-              </ResponsiveContainer>
-            </CardContent>
-          </Card>
+                  cursor={{ fill: 'var(--muted)', fillOpacity: 0.3 }}
+                />
+                <Bar dataKey="count" fill="#4B87F5" radius={[0, 3, 3, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
         </div>
 
         {/* Top Denied Rules */}
