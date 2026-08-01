@@ -319,7 +319,7 @@ See `QUICKSTART.md` for detailed production setup.
 
 ## Next Steps
 
-- Read [SDK_GUIDE.md](../SDK_GUIDE.md) to integrate Aegis SDK
-- Check [DASHBOARD_SUMMARY.md](../DASHBOARD_SUMMARY.md) for architecture
+- Read [SDK_GUIDE.md](../docs/SDK_GUIDE.md) to integrate the Aegis SDK
+- Check [DASHBOARD_SUMMARY.md](../docs/internal/DASHBOARD_SUMMARY.md) for architecture
 - Run tests: `pytest tests/ -v`
 - Explore API docs: http://localhost:8000/docs

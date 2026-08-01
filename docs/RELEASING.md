@@ -206,7 +206,7 @@ source test_env/bin/activate  # Windows: test_env\Scripts\activate
 pip install aegis-sdk==0.2.0
 
 # Test
-python -c "from aegis import PolicyEngine, wrap_tool; print('✅ Success')"
+python -c "from aegis import PolicyEngine, wrap_tool; print('Success')"
 
 # Cleanup
 deactivate
@@ -266,12 +266,12 @@ Post announcement:
 Example announcement:
 
 ```
-🚀 Aegis SDK v0.2.0 is now available!
+Aegis SDK v0.2.0 is now available!
 
 New features:
-✅ Regex pattern matching in policies
-✅ Real-time dashboard with WebSocket feed
-✅ 3x faster audit ingestion
+- Regex pattern matching in policies
+- Real-time dashboard with WebSocket feed
+- 3x faster audit ingestion
 
 Upgrade: pip install --upgrade aegis-sdk
 
@@ -426,7 +426,7 @@ gh release create v0.2.0 \
 
 # 6. Verify
 pip install --upgrade aegis-sdk
-python -c "from aegis import PolicyEngine; print('✅')"
+python -c "from aegis import PolicyEngine; print('OK')"
 ```
 
 ---

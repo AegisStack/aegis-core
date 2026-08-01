@@ -70,7 +70,7 @@ async def create_users():
         )
         session.add(admin)
         await session.commit()
-        print('✅ Created admin@test.com / admin123')
+        print('Created admin@test.com / admin123')
 
 asyncio.run(create_users())
 "
@@ -187,8 +187,8 @@ tools = {
 wrapped = wrap_tool(tools, engine, on_deny="raise")
 
 # Use wrapped tools
-wrapped["read_file"](path="/home/user/documents/report.txt")  # ✅ Allowed
-wrapped["delete_file"](path="/tmp/file.txt")  # ❌ Denied
+wrapped["read_file"](path="/home/user/documents/report.txt")  # Allowed
+wrapped["delete_file"](path="/tmp/file.txt")  # Denied
 ```
 
 ### SDK Configuration Options
@@ -395,8 +395,7 @@ pytest tests/ -v
 
 ## Next Steps
 
-- Read the [full technical specification](aegis-techspec.docx.txt)
-- Review [policy examples](policies/)
-- Check [example integrations](examples/)
-- See [dashboard summary](DASHBOARD_SUMMARY.md)
-- View [test results](TEST_RESULTS.md)
+- Review [policy examples](../policies/)
+- Check [example integrations](../examples/)
+- Read the [SDK Developer Guide](SDK_GUIDE.md)
+- See the [dashboard summary](internal/DASHBOARD_SUMMARY.md)

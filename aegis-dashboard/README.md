@@ -19,11 +19,10 @@ Web-based observability dashboard for Aegis SDK - policy enforcement monitoring 
 - SQLAlchemy 2.0 (async ORM)
 - Alembic (database migrations)
 
-**Frontend:** (Coming in next phase)
+**Frontend:**
 - Next.js 14 with App Router
-- shadcn/ui components
+- shadcn/ui-style components
 - Recharts for visualizations
-- Monaco editor for YAML policies
 
 ## Quick Start
 
@@ -43,9 +42,12 @@ docker-compose up -d
 ```
 
 This starts:
-- PostgreSQL with TimescaleDB on port 5432
+- PostgreSQL with TimescaleDB (host port 5433, container port 5432)
 - Redis on port 6379
 - FastAPI backend on port 8000
+
+The frontend dev server runs separately on port 3003; see
+[../docs/RUNNING_LOCALLY.md](../docs/RUNNING_LOCALLY.md).
 
 2. **Initialize database:**
 
@@ -245,5 +247,5 @@ MIT
 
 ## Support
 
-- Documentation: https://docs.aegis.dev
-- Issues: https://github.com/aegis/aegis-sdk/issues
+- Running locally: [../docs/RUNNING_LOCALLY.md](../docs/RUNNING_LOCALLY.md)
+- Issues: https://github.com/AegisStack/aegis-core/issues
