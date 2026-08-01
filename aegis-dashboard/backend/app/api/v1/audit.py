@@ -2,11 +2,11 @@
 Audit API - Query audit records.
 """
 
-from fastapi import APIRouter, Depends, Query
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, func, and_
-from typing import Optional, List
 from datetime import datetime
+
+from fastapi import APIRouter, Depends, Query
+from sqlalchemy import and_, select
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from ...database import get_db
 from ...models import AuditRecord
@@ -15,14 +15,14 @@ from ...schemas import AuditRecordResponse
 router = APIRouter()
 
 
-@router.get("/audit", response_model=List[AuditRecordResponse])
+@router.get("/audit", response_model=list[AuditRecordResponse])
 async def query_audit_records(
-    customer_id: Optional[str] = Query(None),
-    agent_id: Optional[str] = Query(None),
-    tool_name: Optional[str] = Query(None),
-    outcome: Optional[str] = Query(None),
-    start_time: Optional[datetime] = Query(None),
-    end_time: Optional[datetime] = Query(None),
+    customer_id: str | None = Query(None),
+    agent_id: str | None = Query(None),
+    tool_name: str | None = Query(None),
+    outcome: str | None = Query(None),
+    start_time: datetime | None = Query(None),
+    end_time: datetime | None = Query(None),
     limit: int = Query(100, le=1000),
     offset: int = Query(0, ge=0),
     db: AsyncSession = Depends(get_db),

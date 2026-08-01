@@ -21,6 +21,10 @@ wheels/
 *.egg
 MANIFEST
 
+# The Python "lib/" rule above is unanchored; keep frontend source tracked
+!aegis-dashboard/frontend/src/lib/
+!aegis-dashboard/frontend/src/lib/**
+
 # Virtual environments
 venv/
 env/

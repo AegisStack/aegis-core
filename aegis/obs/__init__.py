@@ -1,26 +1,26 @@
 """Observability layer."""
 
 from .events import (
-    ObservabilityEvent,
-    ToolEvaluatedEvent,
     EscalationCreatedEvent,
     EscalationResolvedEvent,
+    ObservabilityEvent,
     PolicyLoadedEvent,
     SessionSummaryEvent,
+    ToolEvaluatedEvent,
     create_tool_evaluated_event,
 )
-from .sinks import ObsSink, ConsoleSink, PrometheusSink, ObsWriter
+from .sinks import ConsoleSink, ObsSink, ObsWriter, PrometheusSink
 
 __all__ = [
-    "ObservabilityEvent",
-    "ToolEvaluatedEvent",
+    "ConsoleSink",
     "EscalationCreatedEvent",
     "EscalationResolvedEvent",
-    "PolicyLoadedEvent",
-    "SessionSummaryEvent",
-    "create_tool_evaluated_event",
     "ObsSink",
-    "ConsoleSink",
-    "PrometheusSink",
     "ObsWriter",
+    "ObservabilityEvent",
+    "PolicyLoadedEvent",
+    "PrometheusSink",
+    "SessionSummaryEvent",
+    "ToolEvaluatedEvent",
+    "create_tool_evaluated_event",
 ]

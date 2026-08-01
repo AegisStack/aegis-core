@@ -2,10 +2,10 @@
 Audit Record Model - TimescaleDB hypertable for time-series data.
 """
 
-from sqlalchemy import Column, String, Text, Float, Integer, JSON, Index, DateTime
-from sqlalchemy.dialects.postgresql import UUID
-from datetime import datetime
 import uuid
+
+from sqlalchemy import JSON, Column, DateTime, Float, Index, String, Text
+from sqlalchemy.dialects.postgresql import UUID
 
 from ..database import Base
 

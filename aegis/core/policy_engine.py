@@ -4,14 +4,17 @@ Policy Engine - Core evaluation logic for tool calls against policy rules.
 Evaluates tool calls against customer-configured policies with condition operators.
 """
 
+from __future__ import annotations
+
 import re
-from typing import Any, Dict, List, Optional, Union
 from dataclasses import dataclass
 from enum import Enum
+from typing import Any, Optional
 
 
 class Outcome(Enum):
     """Policy evaluation outcomes."""
+
     ALLOW = "allow"
     DENY = "deny"
     ESCALATE = "escalate"
@@ -20,19 +23,20 @@ class Outcome(Enum):
 @dataclass
 class PolicyDecision:
     """Result of policy evaluation."""
+
     outcome: Outcome
     matched_rule: Optional[str]
     reason: str
     policy_version: str
     tool_name: str
-    params: Dict[str, Any]
+    params: dict[str, Any]
 
 
 class ConditionEvaluator:
     """Evaluates policy conditions against parameter values."""
 
     @staticmethod
-    def evaluate(param_value: Any, condition: Dict[str, Any]) -> bool:
+    def evaluate(param_value: Any, condition: dict[str, Any]) -> bool:
         """
         Evaluate a single condition against a parameter value.
 
@@ -84,7 +88,7 @@ class ConditionEvaluator:
         return True
 
     @staticmethod
-    def evaluate_conditions(params: Dict[str, Any], conditions: List[Dict[str, Any]]) -> bool:
+    def evaluate_conditions(params: dict[str, Any], conditions: list[dict[str, Any]]) -> bool:
         """
         Evaluate a list of condition dictionaries against parameters.
 
@@ -123,7 +127,7 @@ class PolicyEngine:
     allow, deny, and escalate outcomes.
     """
 
-    def __init__(self, policy: Dict[str, Any]):
+    def __init__(self, policy: dict[str, Any]):
         """
         Initialize policy engine with a parsed policy.
 
@@ -138,7 +142,7 @@ class PolicyEngine:
         self.policy_version = self._compute_version(policy)
 
     @staticmethod
-    def _validate_policy(policy: Dict[str, Any]) -> None:
+    def _validate_policy(policy: dict[str, Any]) -> None:
         """Validate policy structure."""
         if not isinstance(policy, dict):
             raise ValueError("Policy must be a dictionary")
@@ -153,7 +157,7 @@ class PolicyEngine:
             raise ValueError("Policy 'rules' must be a list")
 
     @staticmethod
-    def _compute_version(policy: Dict[str, Any]) -> str:
+    def _compute_version(policy: dict[str, Any]) -> str:
         """Compute a version hash for the policy."""
         import hashlib
         import json
@@ -163,7 +167,7 @@ class PolicyEngine:
         hash_obj = hashlib.sha256(policy_str.encode())
         return f"policy-v{policy.get('version', 1)}@sha256:{hash_obj.hexdigest()[:16]}"
 
-    def evaluate(self, tool_name: str, params: Dict[str, Any]) -> PolicyDecision:
+    def evaluate(self, tool_name: str, params: dict[str, Any]) -> PolicyDecision:
         """
         Evaluate a tool call against the policy.
 
@@ -183,11 +187,9 @@ class PolicyEngine:
         """
         # Find the tool rule
         tool_rule = None
-        rule_index = None
-        for idx, rule in enumerate(self.policy["rules"]):
+        for rule in self.policy["rules"]:
             if rule.get("tool") == tool_name:
                 tool_rule = rule
-                rule_index = idx
                 break
 
         # If tool not found in policy, apply default
@@ -198,7 +200,10 @@ class PolicyEngine:
             return PolicyDecision(
                 outcome=outcome,
                 matched_rule="defaults.unmatched_tool",
-                reason=f"Tool '{tool_name}' not found in policy, applying default: {default_action}",
+                reason=(
+                    f"Tool '{tool_name}' not found in policy, "
+                    f"applying default: {default_action}"
+                ),
                 policy_version=self.policy_version,
                 tool_name=tool_name,
                 params=params,
@@ -282,10 +287,14 @@ class PolicyEngine:
 
         if default_action == "escalate":
             outcome = Outcome.ESCALATE
-            reason = f"Parameters for '{tool_name}' did not match any allow rule, escalating by default"
+            reason = (
+                f"Parameters for '{tool_name}' did not match any allow rule, escalating by default"
+            )
         else:
             outcome = Outcome.DENY
-            reason = f"Parameters for '{tool_name}' did not match any allow rule, denying by default"
+            reason = (
+                f"Parameters for '{tool_name}' did not match any allow rule, denying by default"
+            )
 
         return PolicyDecision(
             outcome=outcome,
@@ -297,7 +306,7 @@ class PolicyEngine:
         )
 
     @staticmethod
-    def _build_reason(action: str, params: Dict[str, Any], condition: Dict[str, Any]) -> str:
+    def _build_reason(action: str, params: dict[str, Any], condition: dict[str, Any]) -> str:
         """Build a human-readable reason string."""
         # Extract the first condition for the reason
         if not condition:

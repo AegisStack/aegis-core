@@ -2,11 +2,11 @@
 Metrics API - Dashboard statistics and aggregations.
 """
 
-from fastapi import APIRouter, Depends, Query
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, func, and_, desc, case, literal_column, text
-from typing import Optional
 from datetime import datetime, timedelta
+
+from fastapi import APIRouter, Depends, Query
+from sqlalchemy import and_, case, desc, func, select
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from ...database import get_db
 from ...models import AuditRecord
@@ -43,11 +43,11 @@ def _floor_timestamp(col, interval: str):
 @router.get("/metrics/timeseries")
 async def get_metrics_timeseries(
     customer_id: str = Query(...),
-    start: Optional[str] = Query(None, description="ISO datetime start"),
-    end: Optional[str] = Query(None, description="ISO datetime end"),
+    start: str | None = Query(None, description="ISO datetime start"),
+    end: str | None = Query(None, description="ISO datetime end"),
     interval: str = Query("1m", description="Bucket interval: 1m, 5m, 15m, 1h"),
-    agent_id: Optional[str] = Query(None),
-    tool_name: Optional[str] = Query(None),
+    agent_id: str | None = Query(None),
+    tool_name: str | None = Query(None),
     db: AsyncSession = Depends(get_db),
 ):
     """
@@ -82,12 +82,12 @@ async def get_metrics_timeseries(
             func.sum(case((AuditRecord.outcome == "deny", 1), else_=0)).label("denies"),
             func.sum(case((AuditRecord.outcome == "escalate", 1), else_=0)).label("escalations"),
             func.coalesce(func.avg(AuditRecord.latency_ms), 0).label("avg_latency"),
-            func.coalesce(
-                func.percentile_cont(0.95).within_group(AuditRecord.latency_ms), 0
-            ).label("p95_latency"),
-            func.coalesce(
-                func.percentile_cont(0.99).within_group(AuditRecord.latency_ms), 0
-            ).label("p99_latency"),
+            func.coalesce(func.percentile_cont(0.95).within_group(AuditRecord.latency_ms), 0).label(
+                "p95_latency"
+            ),
+            func.coalesce(func.percentile_cont(0.99).within_group(AuditRecord.latency_ms), 0).label(
+                "p99_latency"
+            ),
         )
         .where(and_(*filters))
         .group_by(bucket)
@@ -99,16 +99,18 @@ async def get_metrics_timeseries(
 
     buckets = []
     for row in rows:
-        buckets.append({
-            "time": row.bucket.isoformat() if row.bucket else None,
-            "total": row.total,
-            "allows": row.allows,
-            "denies": row.denies,
-            "escalations": row.escalations,
-            "avg_latency": round(float(row.avg_latency), 2),
-            "p95_latency": round(float(row.p95_latency), 2),
-            "p99_latency": round(float(row.p99_latency), 2),
-        })
+        buckets.append(
+            {
+                "time": row.bucket.isoformat() if row.bucket else None,
+                "total": row.total,
+                "allows": row.allows,
+                "denies": row.denies,
+                "escalations": row.escalations,
+                "avg_latency": round(float(row.avg_latency), 2),
+                "p95_latency": round(float(row.p95_latency), 2),
+                "p99_latency": round(float(row.p99_latency), 2),
+            }
+        )
 
     return {
         "interval": interval,
@@ -121,8 +123,8 @@ async def get_metrics_explore(
     customer_id: str = Query(...),
     start: str = Query(..., description="ISO datetime start"),
     end: str = Query(..., description="ISO datetime end"),
-    outcome: Optional[str] = Query(None, description="Filter by outcome: allow, deny, escalate"),
-    agent_id: Optional[str] = Query(None),
+    outcome: str | None = Query(None, description="Filter by outcome: allow, deny, escalate"),
+    agent_id: str | None = Query(None),
     db: AsyncSession = Depends(get_db),
 ):
     """
@@ -153,12 +155,12 @@ async def get_metrics_explore(
         func.sum(case((AuditRecord.outcome == "deny", 1), else_=0)).label("denies"),
         func.sum(case((AuditRecord.outcome == "escalate", 1), else_=0)).label("escalations"),
         func.coalesce(func.avg(AuditRecord.latency_ms), 0).label("avg_latency"),
-        func.coalesce(
-            func.percentile_cont(0.95).within_group(AuditRecord.latency_ms), 0
-        ).label("p95_latency"),
-        func.coalesce(
-            func.percentile_cont(0.99).within_group(AuditRecord.latency_ms), 0
-        ).label("p99_latency"),
+        func.coalesce(func.percentile_cont(0.95).within_group(AuditRecord.latency_ms), 0).label(
+            "p95_latency"
+        ),
+        func.coalesce(func.percentile_cont(0.99).within_group(AuditRecord.latency_ms), 0).label(
+            "p99_latency"
+        ),
     ).where(and_(*base_filters))
 
     summary_result = await db.execute(summary_query)
@@ -256,9 +258,7 @@ async def get_metrics_summary(
 
     # Total calls
     total_query = select(func.count(AuditRecord.record_id)).where(
-        and_(
-            AuditRecord.customer_id == customer_id, AuditRecord.timestamp >= start_time
-        )
+        and_(AuditRecord.customer_id == customer_id, AuditRecord.timestamp >= start_time)
     )
     total_result = await db.execute(total_query)
     total_calls = total_result.scalar() or 0
@@ -282,9 +282,7 @@ async def get_metrics_summary(
         select(
             AuditRecord.tool_name,
             func.count(AuditRecord.record_id).label("count"),
-            func.sum(
-                case((AuditRecord.outcome == "deny", 1), else_=0)
-            ).label("denies"),
+            func.sum(case((AuditRecord.outcome == "deny", 1), else_=0)).label("denies"),
         )
         .where(
             and_(
@@ -321,9 +319,7 @@ async def get_metrics_summary(
         .limit(10)
     )
     denied_result = await db.execute(denied_query)
-    top_denied_rules = [
-        {"rule": row[0], "count": row[1]} for row in denied_result.fetchall()
-    ]
+    top_denied_rules = [{"rule": row[0], "count": row[1]} for row in denied_result.fetchall()]
 
     # Latency percentiles (simplified - would use percentile_cont in production)
     latency_query = select(

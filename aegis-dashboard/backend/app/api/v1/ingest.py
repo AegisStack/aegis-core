@@ -2,15 +2,13 @@
 Ingestion API - Receives audit records from SDK.
 """
 
-from fastapi import APIRouter, Depends, HTTPException, Header
+from fastapi import APIRouter, Depends, Header, HTTPException
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
-from typing import List
-import asyncio
 
 from ...database import get_db
 from ...models import AuditRecord, Customer
 from ...schemas import AuditRecordCreate
-from sqlalchemy import select
 
 router = APIRouter()
 
@@ -28,7 +26,7 @@ async def verify_api_key(x_api_key: str = Header(...), db: AsyncSession = Depend
 
 @router.post("/ingest/audit", status_code=202)
 async def ingest_audit_records(
-    records: List[AuditRecordCreate],
+    records: list[AuditRecordCreate],
     db: AsyncSession = Depends(get_db),
     customer: Customer = Depends(verify_api_key),
 ):
@@ -41,9 +39,7 @@ async def ingest_audit_records(
     # Validate customer_id matches API key
     for record in records:
         if record.customer_id and record.customer_id != customer.customer_id:
-            raise HTTPException(
-                status_code=403, detail="customer_id does not match API key"
-            )
+            raise HTTPException(status_code=403, detail="customer_id does not match API key")
 
     # Convert to ORM models
     audit_records = [
@@ -76,12 +72,10 @@ async def ingest_audit_records(
 
     # Broadcast to WebSocket connections
     from ...api.websocket import get_connection_manager
+
     manager = get_connection_manager()
     for record in records:
-        await manager.broadcast_audit_record(
-            customer.customer_id,
-            record.dict()
-        )
+        await manager.broadcast_audit_record(customer.customer_id, record.dict())
 
     return {
         "status": "accepted",
@@ -92,7 +86,7 @@ async def ingest_audit_records(
 
 @router.post("/ingest/events", status_code=202)
 async def ingest_observability_events(
-    events: List[dict],
+    events: list[dict],
     db: AsyncSession = Depends(get_db),
     customer: Customer = Depends(verify_api_key),
 ):

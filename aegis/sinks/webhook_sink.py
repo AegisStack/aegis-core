@@ -2,11 +2,14 @@
 Webhook-based audit sink with async support.
 """
 
-import json
+from __future__ import annotations
+
 import queue
 import threading
-from typing import Dict, Optional
+from typing import Optional
+
 import requests
+
 from ..audit.schema import AuditRecord
 
 
@@ -20,7 +23,7 @@ class WebhookSink:
     def __init__(
         self,
         url: str,
-        headers: Optional[Dict[str, str]] = None,
+        headers: Optional[dict[str, str]] = None,
         async_mode: bool = False,
         queue_size: int = 1000,
         timeout: int = 10,

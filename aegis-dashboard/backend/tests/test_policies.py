@@ -3,6 +3,7 @@ Tests for policy management API endpoints.
 """
 
 import pytest
+
 from app.models import Policy
 
 
@@ -70,7 +71,7 @@ async def test_list_policies(client, db_session, test_customer):
         policy = Policy(
             customer_id=test_customer.customer_id,
             agent_id=f"agent-{i}",
-            policy_yaml=f"version: 1\nrules: []",
+            policy_yaml="version: 1\nrules: []",
             policy_hash=f"hash{i}",
             version=1,
             is_active=True,

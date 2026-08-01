@@ -4,18 +4,20 @@ LangChain Integration
 Wraps LangChain tools with policy enforcement.
 """
 
-from typing import Any, Dict, List, Optional, Union
+from __future__ import annotations
+
+from typing import Any, Optional, Union
 
 from ..core.wrapper import wrap
 
 
 def wrap_langchain_tools(
-    tools: List[Any],
-    policy: Union[str, Dict[str, Any]],
+    tools: list[Any],
+    policy: Union[str, dict[str, Any]],
     agent_id: str,
     customer_id: Optional[str] = None,
-    **kwargs
-) -> List[Any]:
+    **kwargs,
+) -> list[Any]:
     """
     Wrap LangChain Tool objects with policy enforcement.
 
@@ -50,11 +52,7 @@ def wrap_langchain_tools(
 
     # Wrap them
     wrapped_funcs = wrap(
-        tools=funcs,
-        policy=policy,
-        agent_id=agent_id,
-        customer_id=customer_id,
-        **kwargs
+        tools=funcs, policy=policy, agent_id=agent_id, customer_id=customer_id, **kwargs
     )
 
     # Create new Tool objects with wrapped funcs
@@ -71,8 +69,8 @@ def wrap_langchain_tools(
                 func=wrapped_func,
                 description=tool.description,
                 # Preserve other attributes if they exist
-                return_direct=getattr(tool, 'return_direct', False),
-                verbose=getattr(tool, 'verbose', False),
+                return_direct=getattr(tool, "return_direct", False),
+                verbose=getattr(tool, "verbose", False),
             )
             wrapped_tools.append(wrapped_tool)
         except ImportError:

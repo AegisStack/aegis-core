@@ -2,9 +2,11 @@
 Tests for audit query API endpoints.
 """
 
-import pytest
-from datetime import datetime, timezone
 import uuid
+from datetime import datetime, timezone
+
+import pytest
+
 from app.models import AuditRecord
 
 

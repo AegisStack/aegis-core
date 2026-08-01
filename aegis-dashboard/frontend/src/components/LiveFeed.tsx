@@ -21,16 +21,17 @@ export function LiveFeed({ customerId, maxItems = 10 }: LiveFeedProps) {
     if (typeof window === 'undefined') return
 
     const ws = new AegisWebSocket(
-      customerId,
       (message: WebSocketMessage) => {
         if (message.type === 'audit_record') {
+          const data = message.data as Record<string, unknown>
           setMessages((prev) => [
-            { ...message.data, timestamp: new Date().toISOString() },
+            { ...data, timestamp: new Date().toISOString() },
             ...prev.slice(0, maxItems - 1),
           ])
         } else if (message.type === 'escalation') {
+          const data = message.data as Record<string, unknown>
           setMessages((prev) => [
-            { ...message.data, timestamp: new Date().toISOString(), isEscalation: true },
+            { ...data, timestamp: new Date().toISOString(), isEscalation: true },
             ...prev.slice(0, maxItems - 1),
           ])
         }

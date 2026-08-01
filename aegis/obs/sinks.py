@@ -4,9 +4,12 @@ Observability Sinks
 Destinations for observability events.
 """
 
+from __future__ import annotations
+
 import json
 import sys
-from typing import Protocol
+from typing import Optional, Protocol
+
 from .events import ObservabilityEvent
 
 
@@ -68,7 +71,6 @@ class PrometheusSink:
     def emit(self, event: ObservabilityEvent) -> None:
         """Emit event as Prometheus metrics."""
         # Placeholder - would update counters/gauges
-        pass
 
 
 class ObsWriter:
@@ -78,7 +80,7 @@ class ObsWriter:
     Similar to AuditWriter but for observability events.
     """
 
-    def __init__(self, sinks: list = None):
+    def __init__(self, sinks: Optional[list] = None):
         """
         Initialize observability writer.
 

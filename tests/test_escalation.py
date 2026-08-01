@@ -3,8 +3,8 @@ Tests for escalation flow.
 """
 
 import pytest
-from aegis.core.escalation import EscalationManager, EscalationRequest
-from aegis import AegisEscalationTimeout
+
+from aegis.core.escalation import EscalationManager
 
 
 class TestEscalationManager:
@@ -12,9 +12,7 @@ class TestEscalationManager:
 
     def test_escalation_creation(self):
         manager = EscalationManager(
-            webhook_url=None,
-            timeout_minutes=30,
-            on_escalate="notify_and_proceed"
+            webhook_url=None, timeout_minutes=30, on_escalate="notify_and_proceed"
         )
 
         escalation = manager.escalate(
@@ -23,7 +21,7 @@ class TestEscalationManager:
             agent_id="billing-agent",
             tool_name="issue_refund",
             params={"amount_usd": 500},
-            reason="Amount exceeds auto-approve limit"
+            reason="Amount exceeds auto-approve limit",
         )
 
         assert escalation.escalation_id.startswith("esc_")
@@ -31,9 +29,7 @@ class TestEscalationManager:
         assert escalation.resolved is False
 
     def test_escalation_resolution(self):
-        manager = EscalationManager(
-            on_escalate="notify_and_proceed"
-        )
+        manager = EscalationManager(on_escalate="notify_and_proceed")
 
         escalation = manager.escalate(
             record_id="rec_123",
@@ -41,14 +37,12 @@ class TestEscalationManager:
             agent_id="billing-agent",
             tool_name="issue_refund",
             params={"amount_usd": 500},
-            reason="Test"
+            reason="Test",
         )
 
         # Resolve it
         manager.resolve(
-            escalation.escalation_id,
-            resolution="approved",
-            resolved_by="sarah@acme.com"
+            escalation.escalation_id, resolution="approved", resolved_by="sarah@acme.com"
         )
 
         resolved = manager.get_escalation(escalation.escalation_id)
@@ -65,15 +59,11 @@ class TestEscalationManager:
             agent_id="test",
             tool_name="test",
             params={},
-            reason="test"
+            reason="test",
         )
 
         with pytest.raises(ValueError, match="Invalid resolution"):
-            manager.resolve(
-                escalation.escalation_id,
-                resolution="invalid",
-                resolved_by="user"
-            )
+            manager.resolve(escalation.escalation_id, resolution="invalid", resolved_by="user")
 
     def test_list_pending_escalations(self):
         manager = EscalationManager(on_escalate="notify_and_proceed")
@@ -85,7 +75,7 @@ class TestEscalationManager:
             agent_id="test",
             tool_name="test",
             params={},
-            reason="test1"
+            reason="test1",
         )
 
         esc2 = manager.escalate(
@@ -94,7 +84,7 @@ class TestEscalationManager:
             agent_id="test",
             tool_name="test",
             params={},
-            reason="test2"
+            reason="test2",
         )
 
         pending = manager.list_pending()

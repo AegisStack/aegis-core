@@ -4,12 +4,15 @@ Escalation Manager - Human-in-the-loop for high-risk tool calls.
 Handles escalation webhooks, blocking, timeout, and resolution.
 """
 
-import uuid
-import time
-import requests
+from __future__ import annotations
+
 import threading
-from typing import Dict, Any, Optional, Callable
-from datetime import datetime, timezone, timedelta
+import time
+import uuid
+from datetime import datetime, timedelta, timezone
+from typing import Any, Callable, Optional
+
+import requests
 
 from ..exceptions import AegisEscalationTimeout
 
@@ -24,7 +27,7 @@ class EscalationRequest:
         customer_id: Optional[str],
         agent_id: str,
         tool_name: str,
-        params: Dict[str, Any],
+        params: dict[str, Any],
         reason: str,
         timeout_minutes: int,
     ):
@@ -56,7 +59,7 @@ class EscalationManager:
         webhook_url: Optional[str] = None,
         timeout_minutes: int = 30,
         on_escalate: str = "block",
-        resolve_callback: Optional[Callable[[str], Dict[str, str]]] = None,
+        resolve_callback: Optional[Callable[[str], dict[str, str]]] = None,
     ):
         """
         Initialize escalation manager.
@@ -73,7 +76,7 @@ class EscalationManager:
         self.resolve_callback = resolve_callback
 
         # Track active escalations
-        self._escalations: Dict[str, EscalationRequest] = {}
+        self._escalations: dict[str, EscalationRequest] = {}
         self._lock = threading.Lock()
 
     def escalate(
@@ -82,7 +85,7 @@ class EscalationManager:
         customer_id: Optional[str],
         agent_id: str,
         tool_name: str,
-        params: Dict[str, Any],
+        params: dict[str, Any],
         reason: str,
     ) -> EscalationRequest:
         """
@@ -246,10 +249,6 @@ class EscalationManager:
         """Remove expired escalations from tracking."""
         now = datetime.now(timezone.utc)
         with self._lock:
-            expired = [
-                eid
-                for eid, e in self._escalations.items()
-                if e.expires_at < now
-            ]
+            expired = [eid for eid, e in self._escalations.items() if e.expires_at < now]
             for eid in expired:
                 del self._escalations[eid]

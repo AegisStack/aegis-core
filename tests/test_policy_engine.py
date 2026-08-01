@@ -3,7 +3,8 @@ Tests for PolicyEngine core evaluation logic.
 """
 
 import pytest
-from aegis.core.policy_engine import PolicyEngine, Outcome, ConditionEvaluator
+
+from aegis.core.policy_engine import ConditionEvaluator, Outcome, PolicyEngine
 
 
 class TestConditionEvaluator:
@@ -42,8 +43,13 @@ class TestConditionEvaluator:
         assert ConditionEvaluator.evaluate("evil.com", {"in": ["acme.com", "trusted.com"]}) is False
 
     def test_not_in_operator(self):
-        assert ConditionEvaluator.evaluate("evil.com", {"not_in": ["acme.com", "trusted.com"]}) is True
-        assert ConditionEvaluator.evaluate("acme.com", {"not_in": ["acme.com", "trusted.com"]}) is False
+        assert (
+            ConditionEvaluator.evaluate("evil.com", {"not_in": ["acme.com", "trusted.com"]}) is True
+        )
+        assert (
+            ConditionEvaluator.evaluate("acme.com", {"not_in": ["acme.com", "trusted.com"]})
+            is False
+        )
 
     def test_regex_operator(self):
         assert ConditionEvaluator.evaluate("/tmp/file.txt", {"regex": r"^/tmp/"}) is True
@@ -61,34 +67,19 @@ class TestPolicyEngine:
     """Test policy engine evaluation."""
 
     def test_allow_always(self):
-        policy = {
-            "version": 1,
-            "rules": [
-                {"tool": "safe_tool", "allow": "always"}
-            ]
-        }
+        policy = {"version": 1, "rules": [{"tool": "safe_tool", "allow": "always"}]}
         engine = PolicyEngine(policy)
         decision = engine.evaluate("safe_tool", {})
         assert decision.outcome == Outcome.ALLOW
 
     def test_deny_always(self):
-        policy = {
-            "version": 1,
-            "rules": [
-                {"tool": "dangerous_tool", "deny": "always"}
-            ]
-        }
+        policy = {"version": 1, "rules": [{"tool": "dangerous_tool", "deny": "always"}]}
         engine = PolicyEngine(policy)
         decision = engine.evaluate("dangerous_tool", {})
         assert decision.outcome == Outcome.DENY
 
     def test_escalate_always(self):
-        policy = {
-            "version": 1,
-            "rules": [
-                {"tool": "sensitive_tool", "escalate": "always"}
-            ]
-        }
+        policy = {"version": 1, "rules": [{"tool": "sensitive_tool", "escalate": "always"}]}
         engine = PolicyEngine(policy)
         decision = engine.evaluate("sensitive_tool", {})
         assert decision.outcome == Outcome.ESCALATE
@@ -100,9 +91,9 @@ class TestPolicyEngine:
                 {
                     "tool": "issue_refund",
                     "allow": [{"amount_usd": {"lte": 200}}],
-                    "deny": [{"amount_usd": {"gt": 200}}]
+                    "deny": [{"amount_usd": {"gt": 200}}],
                 }
-            ]
+            ],
         }
         engine = PolicyEngine(policy)
 
@@ -122,9 +113,9 @@ class TestPolicyEngine:
                     "tool": "issue_refund",
                     "allow": [{"amount_usd": {"lte": 200}}],
                     "escalate": [{"amount_usd": {"gt": 200, "lte": 2000}}],
-                    "deny": [{"amount_usd": {"gt": 2000}}]
+                    "deny": [{"amount_usd": {"gt": 2000}}],
                 }
-            ]
+            ],
         }
         engine = PolicyEngine(policy)
 
@@ -146,9 +137,9 @@ class TestPolicyEngine:
                     "tool": "test_tool",
                     "deny": [{"value": {"gt": 1000}}],
                     "escalate": [{"value": {"gt": 500}}],
-                    "allow": [{"value": {"gt": 0}}]
+                    "allow": [{"value": {"gt": 0}}],
                 }
-            ]
+            ],
         }
         engine = PolicyEngine(policy)
 
@@ -164,9 +155,9 @@ class TestPolicyEngine:
                 {
                     "tool": "test_tool",
                     "escalate": [{"value": {"gt": 500}}],
-                    "allow": [{"value": {"gt": 0}}]
+                    "allow": [{"value": {"gt": 0}}],
                 }
-            ]
+            ],
         }
         engine = PolicyEngine(policy)
 
@@ -175,21 +166,13 @@ class TestPolicyEngine:
         assert decision.outcome == Outcome.ESCALATE
 
     def test_unmatched_tool_default_deny(self):
-        policy = {
-            "version": 1,
-            "rules": [],
-            "defaults": {"unmatched_tool": "deny"}
-        }
+        policy = {"version": 1, "rules": [], "defaults": {"unmatched_tool": "deny"}}
         engine = PolicyEngine(policy)
         decision = engine.evaluate("unknown_tool", {})
         assert decision.outcome == Outcome.DENY
 
     def test_unmatched_tool_default_escalate(self):
-        policy = {
-            "version": 1,
-            "rules": [],
-            "defaults": {"unmatched_tool": "escalate"}
-        }
+        policy = {"version": 1, "rules": [], "defaults": {"unmatched_tool": "escalate"}}
         engine = PolicyEngine(policy)
         decision = engine.evaluate("unknown_tool", {})
         assert decision.outcome == Outcome.ESCALATE
@@ -197,13 +180,8 @@ class TestPolicyEngine:
     def test_unmatched_param_default_deny(self):
         policy = {
             "version": 1,
-            "rules": [
-                {
-                    "tool": "test_tool",
-                    "allow": [{"known_param": {"eq": "value"}}]
-                }
-            ],
-            "defaults": {"unmatched_param": "deny"}
+            "rules": [{"tool": "test_tool", "allow": [{"known_param": {"eq": "value"}}]}],
+            "defaults": {"unmatched_param": "deny"},
         }
         engine = PolicyEngine(policy)
 
@@ -214,13 +192,8 @@ class TestPolicyEngine:
     def test_unmatched_param_default_escalate(self):
         policy = {
             "version": 1,
-            "rules": [
-                {
-                    "tool": "test_tool",
-                    "allow": [{"known_param": {"eq": "value"}}]
-                }
-            ],
-            "defaults": {"unmatched_param": "escalate"}
+            "rules": [{"tool": "test_tool", "allow": [{"known_param": {"eq": "value"}}]}],
+            "defaults": {"unmatched_param": "escalate"},
         }
         engine = PolicyEngine(policy)
 
@@ -235,28 +208,23 @@ class TestPolicyEngine:
                 {
                     "tool": "send_email",
                     "allow": [
-                        {
-                            "recipient_domain": {"in": ["acme.com"]},
-                            "sender": {"eq": "bot@acme.com"}
-                        }
-                    ]
+                        {"recipient_domain": {"in": ["acme.com"]}, "sender": {"eq": "bot@acme.com"}}
+                    ],
                 }
-            ]
+            ],
         }
         engine = PolicyEngine(policy)
 
         # Both match - allow
-        decision = engine.evaluate("send_email", {
-            "recipient_domain": "acme.com",
-            "sender": "bot@acme.com"
-        })
+        decision = engine.evaluate(
+            "send_email", {"recipient_domain": "acme.com", "sender": "bot@acme.com"}
+        )
         assert decision.outcome == Outcome.ALLOW
 
         # Only one matches - deny
-        decision = engine.evaluate("send_email", {
-            "recipient_domain": "acme.com",
-            "sender": "other@acme.com"
-        })
+        decision = engine.evaluate(
+            "send_email", {"recipient_domain": "acme.com", "sender": "other@acme.com"}
+        )
         assert decision.outcome == Outcome.DENY
 
     def test_invalid_policy_missing_version(self):

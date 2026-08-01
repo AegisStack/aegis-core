@@ -2,12 +2,12 @@
 Escalations API - Manage escalation requests.
 """
 
-from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, and_
-from pydantic import BaseModel
-from typing import List, Optional
 from datetime import datetime
+
+from fastapi import APIRouter, Depends, HTTPException, Query
+from pydantic import BaseModel
+from sqlalchemy import and_, select
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from ...database import get_db
 from ...models import Escalation
@@ -20,14 +20,14 @@ class EscalationResponse(BaseModel):
 
     escalation_id: str
     record_id: str
-    customer_id: Optional[str]
+    customer_id: str | None
     agent_id: str
     tool_name: str
     params: dict
     reason: str
     status: str
-    resolved_by: Optional[str]
-    resolution_timestamp: Optional[str]
+    resolved_by: str | None
+    resolution_timestamp: str | None
     created_at: str
     expires_at: str
 
@@ -42,10 +42,10 @@ class ResolveEscalation(BaseModel):
     resolved_by: str
 
 
-@router.get("/escalations", response_model=List[EscalationResponse])
+@router.get("/escalations", response_model=list[EscalationResponse])
 async def list_escalations(
-    customer_id: Optional[str] = Query(None),
-    agent_id: Optional[str] = Query(None),
+    customer_id: str | None = Query(None),
+    agent_id: str | None = Query(None),
     status: str = Query("pending"),
     db: AsyncSession = Depends(get_db),
 ):
@@ -69,9 +69,7 @@ async def list_escalations(
 @router.get("/escalations/{escalation_id}", response_model=EscalationResponse)
 async def get_escalation(escalation_id: str, db: AsyncSession = Depends(get_db)):
     """Get a specific escalation."""
-    result = await db.execute(
-        select(Escalation).where(Escalation.escalation_id == escalation_id)
-    )
+    result = await db.execute(select(Escalation).where(Escalation.escalation_id == escalation_id))
     escalation = result.scalar_one_or_none()
 
     if not escalation:
@@ -94,18 +92,14 @@ async def resolve_escalation(
         raise HTTPException(status_code=400, detail="Resolution must be 'approved' or 'denied'")
 
     # Get escalation
-    result = await db.execute(
-        select(Escalation).where(Escalation.escalation_id == escalation_id)
-    )
+    result = await db.execute(select(Escalation).where(Escalation.escalation_id == escalation_id))
     escalation = result.scalar_one_or_none()
 
     if not escalation:
         raise HTTPException(status_code=404, detail="Escalation not found")
 
     if escalation.status != "pending":
-        raise HTTPException(
-            status_code=409, detail=f"Escalation already {escalation.status}"
-        )
+        raise HTTPException(status_code=409, detail=f"Escalation already {escalation.status}")
 
     # Check if expired
     if datetime.utcnow() > escalation.expires_at:

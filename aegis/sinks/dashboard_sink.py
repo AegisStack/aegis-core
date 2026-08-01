@@ -2,11 +2,11 @@
 Aegis Dashboard Sink - Posts audit records to Aegis Cloud dashboard.
 """
 
-import json
 import queue
 import threading
-from typing import Optional, List
+
 import requests
+
 from ..audit.schema import AuditRecord
 
 
@@ -88,7 +88,7 @@ class AegisDashboardSink:
                         self._queue.task_done()
                     batch = []
 
-    def _send_batch(self, records: List[AuditRecord]) -> None:
+    def _send_batch(self, records: list[AuditRecord]) -> None:
         """Send a batch of records to the dashboard API."""
         try:
             response = requests.post(

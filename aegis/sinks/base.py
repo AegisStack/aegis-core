@@ -3,6 +3,7 @@ Base protocol for audit sinks.
 """
 
 from typing import Protocol
+
 from ..audit.schema import AuditRecord
 
 

@@ -4,16 +4,17 @@ Tool Wrapper - Main interception mechanism for aegis.wrap().
 Wraps tool callables with policy enforcement while preserving function signatures.
 """
 
-import time
-import functools
-from typing import Any, Callable, Dict, List, Optional, Union
+from __future__ import annotations
 
-from .policy_engine import PolicyEngine, Outcome
-from .policy_loader import load_customer_policy, PolicyLoader
-from .escalation import EscalationManager
+import functools
+import time
+from typing import Any, Callable, Optional, Union
+
 from ..audit.schema import create_audit_record
 from ..audit.writer import AuditWriter
-from ..exceptions import AegisViolationError, AegisPolicyLoadError, AegisConfigError
+from ..exceptions import AegisConfigError, AegisPolicyLoadError, AegisViolationError
+from .escalation import EscalationManager
+from .policy_engine import Outcome, PolicyEngine
 
 
 class ToolWrapper:
@@ -78,6 +79,7 @@ class ToolWrapper:
             # Try to get parameter names from function signature
             try:
                 import inspect
+
                 sig = inspect.signature(self.tool)
                 param_names = list(sig.parameters.keys())
                 for i, arg in enumerate(args):
@@ -201,18 +203,18 @@ class ToolWrapper:
 
 
 def wrap(
-    tools: List[Callable],
-    policy: Union[str, Dict[str, Any]],
+    tools: list[Callable],
+    policy: Union[str, dict[str, Any]],
     agent_id: str,
     customer_id: Optional[str] = None,
     session_id: Optional[str] = None,
     on_deny: str = "raise",
     on_escalate: str = "block",
-    audit_sink = None,
-    obs_sink = None,
+    audit_sink=None,
+    obs_sink=None,
     escalation_webhook: Optional[str] = None,
     escalation_timeout_minutes: int = 30,
-) -> List[Callable]:
+) -> list[Callable]:
     """
     Wrap tool callables with policy enforcement.
 
@@ -259,13 +261,15 @@ def wrap(
     # Load policy
     if isinstance(policy, str):
         # Path to YAML file
-        import yaml
         from pathlib import Path
+
+        import yaml
+
         policy_path = Path(policy)
         if not policy_path.exists():
-            raise AegisPolicyLoadError(f"Policy file not found", str(policy_path))
+            raise AegisPolicyLoadError("Policy file not found", str(policy_path))
 
-        with open(policy_path, "r") as f:
+        with open(policy_path) as f:
             policy_dict = yaml.safe_load(f)
     elif isinstance(policy, dict):
         policy_dict = policy
@@ -288,6 +292,7 @@ def wrap(
     audit_writer = None
     if audit_sink:
         from ..audit.writer import AuditWriter
+
         if isinstance(audit_sink, list):
             audit_writer = AuditWriter(sinks=audit_sink)
         else:
@@ -312,12 +317,12 @@ def wrap(
 
 
 def wrap_function_map(
-    function_map: Dict[str, Callable],
-    policy: Union[str, Dict[str, Any]],
+    function_map: dict[str, Callable],
+    policy: Union[str, dict[str, Any]],
     agent_id: str,
     customer_id: Optional[str] = None,
-    **kwargs
-) -> Dict[str, Callable]:
+    **kwargs,
+) -> dict[str, Callable]:
     """
     Wrap a dictionary of functions (for raw OpenAI function calling).
 
@@ -344,11 +349,7 @@ def wrap_function_map(
     """
     tools = list(function_map.values())
     wrapped_tools = wrap(
-        tools=tools,
-        policy=policy,
-        agent_id=agent_id,
-        customer_id=customer_id,
-        **kwargs
+        tools=tools, policy=policy, agent_id=agent_id, customer_id=customer_id, **kwargs
     )
 
     # Rebuild dictionary

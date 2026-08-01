@@ -2,14 +2,15 @@
 Pytest configuration and fixtures for backend tests.
 """
 
-import pytest
 import asyncio
-from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
-from sqlalchemy.pool import NullPool
-from httpx import AsyncClient
 
-from app.main import app
+import pytest
+from httpx import AsyncClient
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
+from sqlalchemy.pool import NullPool
+
 from app.database import Base, get_db
+from app.main import app
 from app.models import Customer
 
 # Test database URL

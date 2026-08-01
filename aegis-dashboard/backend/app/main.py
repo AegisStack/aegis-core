@@ -2,15 +2,16 @@
 Aegis Dashboard API - Main application entry point.
 """
 
-from fastapi import FastAPI
-from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
 
-from .config import get_settings
-from .database import init_db, close_db
-from .redis_client import close_redis
-from .api.v1 import ingest, audit, policies, metrics, escalations, auth
+from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
+
 from .api import websocket
+from .api.v1 import audit, auth, escalations, ingest, metrics, policies
+from .config import get_settings
+from .database import close_db, init_db
+from .redis_client import close_redis
 
 settings = get_settings()
 

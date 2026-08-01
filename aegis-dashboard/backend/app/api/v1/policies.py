@@ -2,13 +2,13 @@
 Policies API - CRUD operations for policies.
 """
 
-from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, and_, desc, func
-from pydantic import BaseModel
-from typing import List, Optional
 import hashlib
+
 import yaml
+from fastapi import APIRouter, Depends, HTTPException, Query
+from pydantic import BaseModel
+from sqlalchemy import and_, desc, func, select
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from ...database import get_db
 from ...models import Policy
@@ -22,16 +22,16 @@ class PolicyCreate(BaseModel):
     customer_id: str
     agent_id: str
     policy_yaml: str
-    description: Optional[str] = None
-    created_by: Optional[str] = None
+    description: str | None = None
+    created_by: str | None = None
 
 
 class PolicyAssignRequest(BaseModel):
     """Schema for assigning a policy to another agent."""
 
     target_agent_id: str
-    description: Optional[str] = None
-    created_by: Optional[str] = None
+    description: str | None = None
+    created_by: str | None = None
 
 
 class PolicyResponse(BaseModel):
@@ -45,8 +45,8 @@ class PolicyResponse(BaseModel):
     version: int
     is_active: bool
     created_at: str
-    created_by: Optional[str]
-    description: Optional[str]
+    created_by: str | None
+    description: str | None
 
     class Config:
         from_attributes = True
@@ -57,7 +57,7 @@ def validate_policy_yaml(policy_yaml: str) -> dict:
     try:
         policy = yaml.safe_load(policy_yaml)
     except yaml.YAMLError as e:
-        raise HTTPException(status_code=400, detail=f"Invalid YAML: {str(e)}")
+        raise HTTPException(status_code=400, detail=f"Invalid YAML: {e!s}")
 
     if not isinstance(policy, dict):
         raise HTTPException(status_code=400, detail="Policy must be a YAML dictionary")
@@ -71,7 +71,7 @@ def validate_policy_yaml(policy_yaml: str) -> dict:
     return policy
 
 
-@router.get("/agents", response_model=List[str])
+@router.get("/agents", response_model=list[str])
 async def list_agents(
     customer_id: str = Query(...),
     db: AsyncSession = Depends(get_db),
@@ -86,10 +86,10 @@ async def list_agents(
     return [row[0] for row in result.fetchall()]
 
 
-@router.get("/policies", response_model=List[PolicyResponse])
+@router.get("/policies", response_model=list[PolicyResponse])
 async def list_policies(
     customer_id: str = Query(...),
-    agent_id: Optional[str] = Query(None),
+    agent_id: str | None = Query(None),
     include_inactive: bool = Query(False),
     db: AsyncSession = Depends(get_db),
 ):
@@ -100,7 +100,7 @@ async def list_policies(
         query = query.where(Policy.agent_id == agent_id)
 
     if not include_inactive:
-        query = query.where(Policy.is_active == True)
+        query = query.where(Policy.is_active.is_(True))
 
     query = query.order_by(desc(Policy.created_at))
 
@@ -138,7 +138,7 @@ async def create_policy(policy_data: PolicyCreate, db: AsyncSession = Depends(ge
             Policy.customer_id == policy_data.customer_id,
             Policy.agent_id == policy_data.agent_id,
             Policy.policy_hash == policy_hash,
-            Policy.is_active == True,
+            Policy.is_active.is_(True),
         )
     )
     existing_result = await db.execute(existing_query)
@@ -154,14 +154,11 @@ async def create_policy(policy_data: PolicyCreate, db: AsyncSession = Depends(ge
     version_result = await db.execute(version_query)
     current_version = version_result.scalar() or 0
 
-    deactivate_query = (
-        select(Policy)
-        .where(
-            and_(
-                Policy.customer_id == policy_data.customer_id,
-                Policy.agent_id == policy_data.agent_id,
-                Policy.is_active == True,
-            )
+    deactivate_query = select(Policy).where(
+        and_(
+            Policy.customer_id == policy_data.customer_id,
+            Policy.agent_id == policy_data.agent_id,
+            Policy.is_active.is_(True),
         )
     )
     deactivate_result = await db.execute(deactivate_query)
@@ -212,7 +209,7 @@ async def assign_policy(
             Policy.customer_id == source_policy.customer_id,
             Policy.agent_id == assign_data.target_agent_id,
             Policy.policy_hash == source_policy.policy_hash,
-            Policy.is_active == True,
+            Policy.is_active.is_(True),
         )
     )
     existing_result = await db.execute(existing_query)
@@ -235,7 +232,7 @@ async def assign_policy(
         and_(
             Policy.customer_id == source_policy.customer_id,
             Policy.agent_id == assign_data.target_agent_id,
-            Policy.is_active == True,
+            Policy.is_active.is_(True),
         )
     )
     deactivate_result = await db.execute(deactivate_query)
@@ -274,7 +271,7 @@ async def activate_policy(policy_id: str, db: AsyncSession = Depends(get_db)):
         and_(
             Policy.customer_id == policy.customer_id,
             Policy.agent_id == policy.agent_id,
-            Policy.is_active == True,
+            Policy.is_active.is_(True),
         )
     )
     deactivate_result = await db.execute(deactivate_query)

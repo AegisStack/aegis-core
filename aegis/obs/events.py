@@ -4,9 +4,11 @@ Observability Events
 Policy-aware observability events for monitoring agent behavior.
 """
 
-from dataclasses import dataclass, asdict, field
+from __future__ import annotations
+
+from dataclasses import asdict, dataclass, field
 from datetime import datetime, timezone
-from typing import Any, Dict, Optional
+from typing import Any, Optional
 
 
 @dataclass
@@ -18,7 +20,7 @@ class ObservabilityEvent:
     agent_id: str = ""
     customer_id: Optional[str] = None
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary."""
         return {k: v for k, v in asdict(self).items() if v is not None}
 
@@ -29,7 +31,7 @@ class ToolEvaluatedEvent(ObservabilityEvent):
 
     event_type: str = "tool_evaluated"
     tool_name: str = ""
-    params: Dict[str, Any] = field(default_factory=dict)
+    params: dict[str, Any] = field(default_factory=dict)
     outcome: str = ""  # allow, deny, escalate
     matched_rule: str = ""
     latency_ms: float = 0.0
@@ -103,7 +105,7 @@ def create_tool_evaluated_event(
     agent_id: str,
     customer_id: Optional[str],
     tool_name: str,
-    params: Dict[str, Any],
+    params: dict[str, Any],
     outcome: str,
     matched_rule: str,
     latency_ms: float,

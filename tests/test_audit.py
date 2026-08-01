@@ -2,11 +2,13 @@
 Tests for audit trail and sinks.
 """
 
-import pytest
 import json
 import tempfile
 from pathlib import Path
-from aegis.audit import AuditRecord, create_audit_record, AuditWriter
+
+import pytest
+
+from aegis.audit import AuditWriter, create_audit_record
 from aegis.sinks import FileSink
 
 

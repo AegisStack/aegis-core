@@ -4,21 +4,21 @@ MCP Server Integration
 Decorator for MCP tool handlers with policy enforcement.
 """
 
-import functools
-from typing import Any, Callable, Dict, Optional, Union
+from __future__ import annotations
 
-from ..core.policy_engine import PolicyEngine
+import functools
+from typing import Any, Callable, Optional, Union
+
 from ..core.wrapper import wrap
-from ..exceptions import AegisViolationError
 
 
 def mcp_enforce(
-    policy: Union[str, Dict[str, Any], Callable],
+    policy: Union[str, dict[str, Any], Callable],
     agent_id: str,
     customer_id: Optional[str] = None,
     on_deny: str = "raise",
     on_escalate: str = "block",
-    **kwargs
+    **kwargs,
 ):
     """
     Decorator for MCP tool call handlers.
@@ -81,7 +81,7 @@ def mcp_enforce(
                 customer_id=resolved_customer_id,
                 on_deny=on_deny,
                 on_escalate=on_escalate,
-                **kwargs
+                **kwargs,
             )
 
             wrapped_tool = wrapped_tools[0]
@@ -95,11 +95,8 @@ def mcp_enforce(
 
 
 def wrap_mcp_tools(
-    tool_handlers: Dict[str, Callable],
-    policy: Union[str, Dict[str, Any]],
-    agent_id: str,
-    **kwargs
-) -> Dict[str, Callable]:
+    tool_handlers: dict[str, Callable], policy: Union[str, dict[str, Any]], agent_id: str, **kwargs
+) -> dict[str, Callable]:
     """
     Wrap a dictionary of MCP tool handlers.
 
@@ -126,4 +123,5 @@ def wrap_mcp_tools(
         ... )
     """
     from ..core.wrapper import wrap_function_map
+
     return wrap_function_map(tool_handlers, policy, agent_id, **kwargs)

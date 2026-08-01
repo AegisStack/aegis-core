@@ -2,21 +2,22 @@
 Authentication API endpoints.
 """
 
-from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
-from pydantic import BaseModel, EmailStr
-from datetime import datetime, timedelta
+from datetime import datetime
 
+from fastapi import APIRouter, Depends, HTTPException, status
+from pydantic import BaseModel, EmailStr
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from ...config import get_settings
 from ...database import get_db
 from ...models.user import User
 from ...services.auth import (
-    verify_password,
-    get_password_hash,
     create_access_token,
     get_current_active_user,
+    get_password_hash,
+    verify_password,
 )
-from ...config import get_settings
 
 router = APIRouter()
 settings = get_settings()

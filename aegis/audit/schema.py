@@ -4,10 +4,12 @@ Audit Record Schema
 Structured, immutable audit records for every policy evaluation.
 """
 
+from __future__ import annotations
+
 import uuid
+from dataclasses import asdict, dataclass, field
 from datetime import datetime, timezone
-from typing import Any, Dict, Optional
-from dataclasses import dataclass, field, asdict
+from typing import Any, Optional
 
 
 @dataclass
@@ -31,7 +33,7 @@ class AuditRecord:
     # Policy evaluation
     policy_version: str = ""
     tool_name: str = ""
-    params: Dict[str, Any] = field(default_factory=dict)
+    params: dict[str, Any] = field(default_factory=dict)
     outcome: str = ""  # "allow", "deny", "escalate"
     matched_rule: str = ""
     reason: str = ""
@@ -49,13 +51,14 @@ class AuditRecord:
     # Performance
     latency_ms: Optional[float] = None
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary for serialization."""
         return {k: v for k, v in asdict(self).items() if v is not None}
 
     def to_json(self) -> str:
         """Convert to JSON string."""
         import json
+
         return json.dumps(self.to_dict(), default=str)
 
 
@@ -65,7 +68,7 @@ def create_audit_record(
     session_id: Optional[str],
     policy_version: str,
     tool_name: str,
-    params: Dict[str, Any],
+    params: dict[str, Any],
     outcome: str,
     matched_rule: str,
     reason: str,

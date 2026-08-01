@@ -2,22 +2,21 @@
 WebSocket endpoint for real-time audit record streaming.
 """
 
-from fastapi import APIRouter, WebSocket, WebSocketDisconnect, Query
-from typing import Set
-import json
 import asyncio
+
+from fastapi import APIRouter, Query, WebSocket, WebSocketDisconnect
 
 router = APIRouter()
 
 # Active WebSocket connections per customer
-active_connections: dict[str, Set[WebSocket]] = {}
+active_connections: dict[str, set[WebSocket]] = {}
 
 
 class ConnectionManager:
     """Manages WebSocket connections for real-time updates."""
 
     def __init__(self):
-        self.active_connections: dict[str, Set[WebSocket]] = {}
+        self.active_connections: dict[str, set[WebSocket]] = {}
 
     async def connect(self, websocket: WebSocket, customer_id: str):
         """Accept WebSocket connection and add to customer group."""
@@ -88,11 +87,13 @@ async def websocket_endpoint(
 
     try:
         # Send initial connection confirmation
-        await websocket.send_json({
-            "type": "connected",
-            "customer_id": customer_id,
-            "message": "Connected to Aegis live feed",
-        })
+        await websocket.send_json(
+            {
+                "type": "connected",
+                "customer_id": customer_id,
+                "message": "Connected to Aegis live feed",
+            }
+        )
 
         # Keep connection alive with heartbeat
         while True:

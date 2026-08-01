@@ -2,11 +2,12 @@
 File-based audit sink with rotation support.
 """
 
-import os
-import json
-from pathlib import Path
+from __future__ import annotations
+
 from datetime import datetime
+from pathlib import Path
 from typing import Optional
+
 from ..audit.schema import AuditRecord
 
 
@@ -95,8 +96,7 @@ class FileSink:
 
         file_path = self._get_file_path()
         with open(file_path, "a") as f:
-            for record in self._buffer:
-                f.write(record.to_json() + "\n")
+            f.writelines(record.to_json() + "\n" for record in self._buffer)
 
         self._buffer.clear()
 

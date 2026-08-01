@@ -4,12 +4,13 @@ Policy Loader - Multi-tenant policy loading with caching support.
 Loads policies from various backends: filesystem, S3, GCS, or custom stores.
 """
 
-import yaml
+from __future__ import annotations
+
 import time
-import hashlib
-from typing import Any, Dict, Optional, Protocol
 from pathlib import Path
-from abc import ABC, abstractmethod
+from typing import Any, Optional, Protocol
+
+import yaml
 
 from ..exceptions import AegisPolicyLoadError
 
@@ -17,7 +18,7 @@ from ..exceptions import AegisPolicyLoadError
 class PolicyStore(Protocol):
     """Protocol for custom policy storage backends."""
 
-    def load_policy(self, customer_id: str) -> Dict[str, Any]:
+    def load_policy(self, customer_id: str) -> dict[str, Any]:
         """Load policy for a customer. Returns parsed policy dict."""
         ...
 
@@ -34,7 +35,7 @@ class FilesystemPolicyStore:
         """
         self.base_path = Path(base_path)
 
-    def load_policy(self, customer_id: str) -> Dict[str, Any]:
+    def load_policy(self, customer_id: str) -> dict[str, Any]:
         """
         Load policy from filesystem.
 
@@ -54,28 +55,23 @@ class FilesystemPolicyStore:
             policy_path = self.base_path / f"{customer_id}{ext}"
             if policy_path.exists():
                 try:
-                    with open(policy_path, "r") as f:
+                    with open(policy_path) as f:
                         policy = yaml.safe_load(f)
                         if not isinstance(policy, dict):
                             raise AegisPolicyLoadError(
-                                f"Policy file must contain a YAML dictionary",
-                                str(policy_path)
+                                "Policy file must contain a YAML dictionary", str(policy_path)
                             )
                         return policy
                 except yaml.YAMLError as e:
                     raise AegisPolicyLoadError(
-                        f"Invalid YAML in policy file: {e}",
-                        str(policy_path)
+                        f"Invalid YAML in policy file: {e}", str(policy_path)
                     )
                 except Exception as e:
-                    raise AegisPolicyLoadError(
-                        f"Error reading policy file: {e}",
-                        str(policy_path)
-                    )
+                    raise AegisPolicyLoadError(f"Error reading policy file: {e}", str(policy_path))
 
         raise AegisPolicyLoadError(
             f"Policy file not found for customer '{customer_id}'",
-            str(self.base_path / f"{customer_id}.yaml")
+            str(self.base_path / f"{customer_id}.yaml"),
         )
 
 
@@ -99,6 +95,7 @@ class S3PolicyStore:
         if self._s3_client is None:
             try:
                 import boto3
+
                 self._s3_client = boto3.client("s3")
             except ImportError:
                 raise AegisPolicyLoadError(
@@ -106,7 +103,7 @@ class S3PolicyStore:
                 )
         return self._s3_client
 
-    def load_policy(self, customer_id: str) -> Dict[str, Any]:
+    def load_policy(self, customer_id: str) -> dict[str, Any]:
         """
         Load policy from S3.
 
@@ -129,26 +126,20 @@ class S3PolicyStore:
 
             if not isinstance(policy, dict):
                 raise AegisPolicyLoadError(
-                    f"Policy must be a YAML dictionary",
-                    f"s3://{self.bucket}/{key}"
+                    "Policy must be a YAML dictionary", f"s3://{self.bucket}/{key}"
                 )
 
             return policy
 
         except s3.exceptions.NoSuchKey:
             raise AegisPolicyLoadError(
-                f"Policy not found for customer '{customer_id}'",
-                f"s3://{self.bucket}/{key}"
+                f"Policy not found for customer '{customer_id}'", f"s3://{self.bucket}/{key}"
             )
         except yaml.YAMLError as e:
-            raise AegisPolicyLoadError(
-                f"Invalid YAML in policy: {e}",
-                f"s3://{self.bucket}/{key}"
-            )
+            raise AegisPolicyLoadError(f"Invalid YAML in policy: {e}", f"s3://{self.bucket}/{key}")
         except Exception as e:
             raise AegisPolicyLoadError(
-                f"Error loading policy from S3: {e}",
-                f"s3://{self.bucket}/{key}"
+                f"Error loading policy from S3: {e}", f"s3://{self.bucket}/{key}"
             )
 
 
@@ -208,7 +199,7 @@ class DashboardPolicyStore:
         self.agent_id = agent_id
         self.timeout = timeout
 
-    def load_policy(self, customer_id: str) -> Dict[str, Any]:
+    def load_policy(self, customer_id: str) -> dict[str, Any]:
         """
         Fetch the active policy for *customer_id* + *agent_id* from the
         dashboard and return it as a parsed dictionary.
@@ -309,6 +300,7 @@ class GCSPolicyStore:
         if self._gcs_client is None:
             try:
                 from google.cloud import storage
+
                 self._gcs_client = storage.Client()
             except ImportError:
                 raise AegisPolicyLoadError(
@@ -316,7 +308,7 @@ class GCSPolicyStore:
                 )
         return self._gcs_client
 
-    def load_policy(self, customer_id: str) -> Dict[str, Any]:
+    def load_policy(self, customer_id: str) -> dict[str, Any]:
         """
         Load policy from GCS.
 
@@ -340,8 +332,7 @@ class GCSPolicyStore:
 
             if not isinstance(policy, dict):
                 raise AegisPolicyLoadError(
-                    f"Policy must be a YAML dictionary",
-                    f"gs://{self.bucket_name}/{blob_name}"
+                    "Policy must be a YAML dictionary", f"gs://{self.bucket_name}/{blob_name}"
                 )
 
             return policy
@@ -350,11 +341,10 @@ class GCSPolicyStore:
             if "404" in str(e):
                 raise AegisPolicyLoadError(
                     f"Policy not found for customer '{customer_id}'",
-                    f"gs://{self.bucket_name}/{blob_name}"
+                    f"gs://{self.bucket_name}/{blob_name}",
                 )
             raise AegisPolicyLoadError(
-                f"Error loading policy from GCS: {e}",
-                f"gs://{self.bucket_name}/{blob_name}"
+                f"Error loading policy from GCS: {e}", f"gs://{self.bucket_name}/{blob_name}"
             )
 
 
@@ -369,9 +359,9 @@ class PolicyCache:
             ttl_seconds: Time-to-live for cached policies
         """
         self.ttl_seconds = ttl_seconds
-        self._cache: Dict[str, tuple[Dict[str, Any], float]] = {}
+        self._cache: dict[str, tuple[dict[str, Any], float]] = {}
 
-    def get(self, customer_id: str) -> Optional[Dict[str, Any]]:
+    def get(self, customer_id: str) -> Optional[dict[str, Any]]:
         """
         Get cached policy if not expired.
 
@@ -390,7 +380,7 @@ class PolicyCache:
                 del self._cache[customer_id]
         return None
 
-    def set(self, customer_id: str, policy: Dict[str, Any]) -> None:
+    def set(self, customer_id: str, policy: dict[str, Any]) -> None:
         """
         Cache a policy.
 
@@ -400,7 +390,7 @@ class PolicyCache:
         """
         self._cache[customer_id] = (policy, time.time())
 
-    def invalidate(self, customer_id: str = None) -> None:
+    def invalidate(self, customer_id: Optional[str] = None) -> None:
         """
         Invalidate cached policies.
 
@@ -422,10 +412,7 @@ class PolicyLoader:
     """
 
     def __init__(
-        self,
-        store: Optional[PolicyStore] = None,
-        cache_ttl: int = 60,
-        enable_cache: bool = True
+        self, store: Optional[PolicyStore] = None, cache_ttl: int = 60, enable_cache: bool = True
     ):
         """
         Initialize policy loader.
@@ -438,7 +425,7 @@ class PolicyLoader:
         self.store = store or FilesystemPolicyStore()
         self.cache = PolicyCache(ttl_seconds=cache_ttl) if enable_cache else None
 
-    def load(self, customer_id: str) -> Dict[str, Any]:
+    def load(self, customer_id: str) -> dict[str, Any]:
         """
         Load policy for a customer.
 
@@ -462,16 +449,10 @@ class PolicyLoader:
 
         # Validate basic structure
         if "version" not in policy:
-            raise AegisPolicyLoadError(
-                f"Policy missing required 'version' field",
-                customer_id
-            )
+            raise AegisPolicyLoadError("Policy missing required 'version' field", customer_id)
 
         if "rules" not in policy:
-            raise AegisPolicyLoadError(
-                f"Policy missing required 'rules' field",
-                customer_id
-            )
+            raise AegisPolicyLoadError("Policy missing required 'rules' field", customer_id)
 
         # Cache and return
         if self.cache:
@@ -479,7 +460,7 @@ class PolicyLoader:
 
         return policy
 
-    def invalidate_cache(self, customer_id: str = None) -> None:
+    def invalidate_cache(self, customer_id: Optional[str] = None) -> None:
         """
         Invalidate policy cache.
 
@@ -495,10 +476,7 @@ class PolicyLoader:
 _policy_loader: Optional[PolicyLoader] = None
 
 
-def register_policy_store(
-    backend: str = "filesystem",
-    **kwargs
-) -> PolicyLoader:
+def register_policy_store(backend: str = "filesystem", **kwargs) -> PolicyLoader:
     """
     Register a global policy store for use with load_customer_policy().
 
@@ -549,16 +527,12 @@ def register_policy_store(
     cache_ttl = kwargs.get("cache_ttl", 60)
     enable_cache = kwargs.get("enable_cache", True)
 
-    _policy_loader = PolicyLoader(
-        store=store,
-        cache_ttl=cache_ttl,
-        enable_cache=enable_cache
-    )
+    _policy_loader = PolicyLoader(store=store, cache_ttl=cache_ttl, enable_cache=enable_cache)
 
     return _policy_loader
 
 
-def load_customer_policy(customer_id: str) -> Dict[str, Any]:
+def load_customer_policy(customer_id: str) -> dict[str, Any]:
     """
     Load policy for a customer using the registered policy store.
 

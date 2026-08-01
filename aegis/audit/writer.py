@@ -4,7 +4,10 @@ Audit Writer
 Writes structured audit records to configured sinks.
 """
 
-from typing import List, Optional
+from __future__ import annotations
+
+from typing import Optional
+
 from .schema import AuditRecord
 
 
@@ -15,7 +18,7 @@ class AuditWriter:
     Handles async/sync writing and error handling.
     """
 
-    def __init__(self, sinks: Optional[List] = None):
+    def __init__(self, sinks: Optional[list] = None):
         """
         Initialize audit writer.
 

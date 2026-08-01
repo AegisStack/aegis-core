@@ -2,10 +2,10 @@
 Escalation Model - Tracks escalation requests and resolutions.
 """
 
-from sqlalchemy import Column, String, Text, DateTime, JSON, Index
-from sqlalchemy.dialects.postgresql import UUID
 from datetime import datetime
-import uuid
+
+from sqlalchemy import JSON, Column, DateTime, Index, String, Text
+from sqlalchemy.dialects.postgresql import UUID
 
 from ..database import Base
 
