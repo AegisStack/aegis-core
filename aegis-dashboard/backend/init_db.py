@@ -371,7 +371,7 @@ async def seed_customer(session: AsyncSession, cfg: dict):
         select(Customer).where(Customer.customer_id == cfg["customer_id"])
     )
     if existing.scalar_one_or_none():
-        print(f"  ⚠️  {cfg['customer_id']} already exists — skipping")
+        print(f"  [skip] {cfg['customer_id']} already exists")
         return
 
     session.add(Customer(
@@ -392,7 +392,7 @@ async def seed_customer(session: AsyncSession, cfg: dict):
             is_verified=True,
         ))
 
-    print(f"  ✅  {cfg['customer_id']} — {len(cfg['users'])} users")
+    print(f"  [ok]   {cfg['customer_id']} — {len(cfg['users'])} users")
 
 
 async def seed_policies(session: AsyncSession, customer_id: str):
@@ -415,7 +415,7 @@ async def seed_policies(session: AsyncSession, customer_id: str):
                 description=v["description"],
             ))
             total += 1
-    print(f"  ✅  {customer_id} — {total} policy versions across {len(agent_configs)} agents")
+    print(f"  [ok]   {customer_id} — {total} policy versions across {len(agent_configs)} agents")
 
 
 async def seed_audit_and_escalations(session: AsyncSession, customer_id: str, n_regular: int):
@@ -534,7 +534,7 @@ async def seed_audit_and_escalations(session: AsyncSession, customer_id: str, n_
 
     pending = sum(1 for s, *_ in esc_statuses if s == "pending")
     print(
-        f"  ✅  {customer_id} — {n_regular} allow/deny records + "
+        f"  [ok]   {customer_id} — {n_regular} allow/deny records + "
         f"{len(esc_statuses)} escalations ({pending} pending)"
     )
 
@@ -584,28 +584,28 @@ async def init_database():
         "DATABASE_URL",
         "postgresql+asyncpg://aegis:aegis@localhost:5433/aegis_dashboard",
     )
-    print(f"🔌  Connecting to {db_url.split('@')[1]} ...\n")
+    print(f"Connecting to {db_url.split('@')[1]} ...\n")
     engine = create_async_engine(db_url, echo=False)
     async_session = sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
 
     try:
-        print("📊  Creating tables ...")
+        print("Creating tables ...")
         async with engine.begin() as conn:
             await conn.run_sync(Base.metadata.create_all)
 
-        print("\n👤  Seeding customers & users ...")
+        print("\nSeeding customers & users ...")
         async with async_session() as session:
             for cfg in CUSTOMERS:
                 await seed_customer(session, cfg)
             await session.commit()
 
-        print("\n📋  Seeding policies ...")
+        print("\nSeeding policies ...")
         async with async_session() as session:
             for cfg in CUSTOMERS:
                 await seed_policies(session, cfg["customer_id"])
             await session.commit()
 
-        print("\n📝  Seeding audit records & escalations ...")
+        print("\nSeeding audit records & escalations ...")
         async with async_session() as session:
             for cfg in CUSTOMERS:
                 await seed_audit_and_escalations(
@@ -613,7 +613,7 @@ async def init_database():
                 )
             await session.commit()
 
-        print("\n✅  Done!\n")
+        print("\nDone.\n")
         print("─" * 55)
         print("  Account summary")
         print("─" * 55)
@@ -622,17 +622,17 @@ async def init_database():
             for email, _, role, password in cfg["users"]:
                 print(f"    {role:10s}  {email}  /  {password}")
         print("\n─" * 55)
-        print("  🌐  Dashboard: http://localhost:3003")
-        print("  📡  Backend:   http://localhost:8000")
-        print("  📚  API Docs:  http://localhost:8000/docs\n")
+        print("  Dashboard: http://localhost:3003")
+        print("  Backend:   http://localhost:8000")
+        print("  API Docs:  http://localhost:8000/docs\n")
 
     except Exception as e:
-        print(f"\n❌  Error: {e}")
+        print(f"\nError: {e}")
         raise
     finally:
         await engine.dispose()
 
 
 if __name__ == "__main__":
-    print("🚀  Aegis Dashboard — seed database\n")
+    print("Aegis Dashboard — seed database\n")
     asyncio.run(init_database())

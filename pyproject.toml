@@ -56,10 +56,9 @@ all = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/aegis/aegis-sdk"
-Documentation = "https://docs.aegis.dev"
-Repository = "https://github.com/aegis/aegis-sdk"
-Issues = "https://github.com/aegis/aegis-sdk/issues"
+Homepage = "https://github.com/AegisStack/aegis-core"
+Repository = "https://github.com/AegisStack/aegis-core"
+Issues = "https://github.com/AegisStack/aegis-core/issues"
 
 [tool.setuptools.packages.find]
 include = ["aegis*"]

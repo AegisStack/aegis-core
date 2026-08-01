@@ -1,4 +1,5 @@
 version: 1
+terms: []
 agent_role: billing-agent
 customer_id: acme-corp
 policy_owner: sarah@acme.com

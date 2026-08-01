@@ -13,7 +13,7 @@ async def main():
         existing = result.scalar_one_or_none()
 
         if existing:
-            print("✅ Test data already exists!")
+            print("Test data already exists.")
             print("\nLogin credentials:")
             print("  admin@test.com / admin123")
             print("  operator@test.com / operator123")
@@ -60,7 +60,7 @@ async def main():
         db.add_all([admin, operator, viewer])
         await db.commit()
 
-        print("\n✅ Test data created successfully!")
+        print("\nTest data created successfully.")
         print("\nLogin credentials:")
         print("  Admin:    admin@test.com / admin123")
         print("  Operator: operator@test.com / operator123")
