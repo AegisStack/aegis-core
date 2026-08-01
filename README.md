@@ -28,7 +28,7 @@ aegis-core/
 │   └── sinks/              # File, webhook, and dashboard sinks
 ├── tests/                  # SDK test suite
 ├── examples/               # Runnable usage examples
-├── policies/               # Example policy files
+│   └── policies/           # Example policy files used by the examples
 ├── aegis-dashboard/        # Full-stack observability dashboard
 │   ├── backend/            # FastAPI + SQLAlchemy + TimescaleDB
 │   └── frontend/           # Next.js + React + Tailwind

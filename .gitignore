@@ -50,4 +50,5 @@ audit/*.jsonl
 
 # Local policy files (for testing)
 policies/*.yaml
-!policies/example-*.yaml
+examples/policies/*.yaml
+!examples/policies/example-*.yaml

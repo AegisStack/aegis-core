@@ -16,7 +16,7 @@ def main():
     # Register policy store (filesystem in this example)
     aegis.register_policy_store(
         backend="filesystem",
-        base_path="./policies",
+        base_path="./examples/policies",
         cache_ttl=60
     )
 

@@ -395,7 +395,7 @@ pytest tests/ -v
 
 ## Next Steps
 
-- Review [policy examples](../policies/)
+- Review [policy examples](../examples/policies/)
 - Check [example integrations](../examples/)
 - Read the [SDK Developer Guide](SDK_GUIDE.md)
 - See the [dashboard summary](internal/DASHBOARD_SUMMARY.md)

@@ -33,7 +33,7 @@ def main():
     # Wrap tools with policy enforcement
     tools = aegis.wrap(
         tools=[issue_refund, update_crm, deploy],
-        policy="./policies/example-billing.yaml",
+        policy="./examples/policies/example-billing.yaml",
         agent_id="billing-agent",
         customer_id="acme-corp",
         audit_sink=audit_sink,

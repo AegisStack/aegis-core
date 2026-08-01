@@ -41,7 +41,7 @@ def main():
     # Wrap with Aegis enforcement
     tools = aegis.wrap_langchain_tools(
         tools=raw_tools,
-        policy="./policies/example-billing.yaml",
+        policy="./examples/policies/example-billing.yaml",
         agent_id="billing-agent",
         customer_id="acme-corp",
         audit_sink=aegis.FileSink(path="./audit/langchain-agent.jsonl"),
