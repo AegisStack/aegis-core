@@ -1,2 +1,24 @@
-.next/
+# dependencies
 node_modules/
+
+# next.js build output
+.next/
+out/
+
+# production build
+build/
+
+# typescript
+*.tsbuildinfo
+next-env.d.ts
+
+# testing
+coverage/
+
+# misc
+.DS_Store
+*.log
+
+# local env files
+.env
+.env*.local
