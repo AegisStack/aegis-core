@@ -1,0 +1,45 @@
+# Local linting hook. pre-commit runs these ONLY on the files you've staged
+# (git add) — not the whole repo. Each hook's `files` pattern further scopes it
+# to a package, and pre-commit passes just the matching staged paths to the tool.
+#
+# Setup (once):   pip install pre-commit && pre-commit install
+# Run on demand:  pre-commit run --all-files
+#
+# Note: black and ruff here run in check-only mode to match CI. Use the
+# Makefile targets (`make format`) if you want them to fix files in place.
+
+repos:
+  # ---- Python: SDK (aegis/, tests/) and dashboard backend ----
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.16.1
+    hooks:
+      - id: ruff
+        name: ruff (SDK + backend)
+        files: ^(aegis/|tests/|aegis-dashboard/backend/)
+
+  - repo: https://github.com/psf/black
+    rev: 26.5.1
+    hooks:
+      - id: black
+        name: black --check (SDK + backend)
+        args: [--check]
+        files: ^(aegis/|tests/|aegis-dashboard/backend/)
+
+  # NOTE: mypy is intentionally omitted for now (matches lint.yml). The SDK has
+  # ~31 missing type annotations to add before it can pass; reintroduce a mypy
+  # hook here once those are resolved.
+
+  # ---- Frontend: Next.js / TypeScript ----
+  # ESLint runs only on the staged frontend files. pre-commit hands us
+  # repo-relative paths (aegis-dashboard/frontend/...); we cd into the package
+  # and strip that prefix so eslint resolves them against its own config.
+  - repo: local
+    hooks:
+      - id: frontend-eslint
+        name: eslint (frontend, staged files only)
+        entry: bash -c 'cd aegis-dashboard/frontend && exec npx --no-install eslint "${@#aegis-dashboard/frontend/}"' --
+        language: system
+        files: ^aegis-dashboard/frontend/.*\.(ts|tsx|js|jsx)$
+        # tsc type-checking is intentionally NOT a pre-commit hook: it is
+        # whole-project (a staged file's types depend on files you did not
+        # stage), so it cannot be scoped to staged files. It runs in CI only.

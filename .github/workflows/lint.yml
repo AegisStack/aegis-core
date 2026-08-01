@@ -1,0 +1,101 @@
+name: Lint
+
+on:
+  pull_request:
+    branches: [main]
+
+# Cancel in-progress runs for the same PR when new commits are pushed.
+concurrency:
+  group: lint-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  # Detect which packages changed so each linter only runs when relevant.
+  changes:
+    name: Detect changes
+    runs-on: ubuntu-latest
+    outputs:
+      sdk: ${{ steps.filter.outputs.sdk }}
+      backend: ${{ steps.filter.outputs.backend }}
+      frontend: ${{ steps.filter.outputs.frontend }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            sdk:
+              - 'aegis/**'
+              - 'tests/**'
+              - 'pyproject.toml'
+            backend:
+              - 'aegis-dashboard/backend/**'
+            frontend:
+              - 'aegis-dashboard/frontend/**'
+
+  sdk:
+    name: Lint SDK (Python)
+    needs: changes
+    if: needs.changes.outputs.sdk == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install dependencies
+        # Pin exact versions so CI matches .pre-commit-config.yaml and local runs.
+        run: python -m pip install --upgrade pip "ruff==0.16.1" "black==26.5.1"
+      - name: Ruff
+        run: ruff check aegis tests
+      - name: Black
+        run: black --check aegis tests
+      # NOTE: mypy is intentionally omitted for now. The SDK has ~31 missing
+      # type annotations to add before it can pass; reintroduce this step once
+      # those are resolved (see CONTRIBUTING.md).
+
+  backend:
+    name: Lint Dashboard Backend (Python)
+    needs: changes
+    if: needs.changes.outputs.backend == 'true'
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: aegis-dashboard/backend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install dependencies
+        # Pin exact versions so CI matches .pre-commit-config.yaml and local runs.
+        run: python -m pip install --upgrade pip "ruff==0.16.1" "black==26.5.1"
+      - name: Ruff
+        run: ruff check app tests
+      - name: Black
+        run: black --check app tests
+
+  frontend:
+    name: Lint Dashboard Frontend (TypeScript)
+    needs: changes
+    if: needs.changes.outputs.frontend == 'true'
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: aegis-dashboard/frontend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+          cache-dependency-path: aegis-dashboard/frontend/package-lock.json
+      - name: Install dependencies
+        run: npm ci
+      - name: ESLint
+        run: npm run lint
+      - name: Type check
+        run: npm run type-check

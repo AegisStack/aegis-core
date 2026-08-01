@@ -47,9 +47,9 @@ dev = [
     "pytest>=7.4.0",
     "pytest-asyncio>=0.21.0",
     "pytest-cov>=4.1.0",
-    "black>=23.0.0",
+    "black==26.5.1",
     "mypy>=1.5.0",
-    "ruff>=0.1.0",
+    "ruff==0.16.1",
 ]
 all = [
     "aegis-sdk[langchain,mcp,s3,gcs]",
@@ -83,3 +83,12 @@ disallow_untyped_defs = true
 [tool.ruff]
 line-length = 100
 target-version = "py39"
+
+[tool.ruff.lint]
+# Pin the ruleset explicitly so it does not drift as ruff's defaults change
+# between versions. E/W = pycodestyle, F = pyflakes, I = isort, UP = pyupgrade.
+select = ["E", "F", "W", "I", "UP"]
+# UP007/UP045 rewrite Optional[X] to `X | None`, which is py3.10+ runtime
+# syntax. This package targets py3.9 where those annotations are evaluated
+# (pydantic/dataclasses), so keep the Optional[...] form.
+ignore = ["UP007", "UP045"]
