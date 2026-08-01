@@ -24,11 +24,10 @@ MYPY := $(PY) -m mypy
 lint: lint-sdk lint-backend lint-frontend
 
 # ---- SDK (aegis/, tests/) ----
-# mypy is intentionally omitted for now (matches CI). Run `$(MYPY) aegis`
-# manually if you want to work through the missing annotations.
 lint-sdk:
 	$(RUFF) check aegis tests
 	$(BLACK) --check aegis tests
+	$(MYPY) aegis
 
 format-sdk:
 	$(RUFF) check --fix aegis tests

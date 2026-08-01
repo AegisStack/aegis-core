@@ -18,8 +18,8 @@ def mcp_enforce(
     customer_id: Optional[str] = None,
     on_deny: str = "raise",
     on_escalate: str = "block",
-    **kwargs,
-):
+    **kwargs: Any,
+) -> Callable:
     """
     Decorator for MCP tool call handlers.
 
@@ -54,7 +54,7 @@ def mcp_enforce(
 
     def decorator(func: Callable) -> Callable:
         @functools.wraps(func)
-        async def wrapper(name: str, arguments: dict, context: Any = None):
+        async def wrapper(name: str, arguments: dict, context: Any = None) -> Any:
             # Resolve policy if callable
             if callable(policy):
                 resolved_policy = policy(context)
@@ -67,7 +67,7 @@ def mcp_enforce(
                 resolved_customer_id = customer_id(context)
 
             # Create a temporary tool function for this specific call
-            async def temp_tool(**args):
+            async def temp_tool(**args: Any) -> Any:
                 return await func(name, args, context)
 
             # Set the name for policy evaluation
@@ -95,7 +95,10 @@ def mcp_enforce(
 
 
 def wrap_mcp_tools(
-    tool_handlers: dict[str, Callable], policy: Union[str, dict[str, Any]], agent_id: str, **kwargs
+    tool_handlers: dict[str, Callable],
+    policy: Union[str, dict[str, Any]],
+    agent_id: str,
+    **kwargs: Any,
 ) -> dict[str, Callable]:
     """
     Wrap a dictionary of MCP tool handlers.

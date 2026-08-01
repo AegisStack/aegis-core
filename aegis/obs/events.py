@@ -36,7 +36,7 @@ class ToolEvaluatedEvent(ObservabilityEvent):
     matched_rule: str = ""
     latency_ms: float = 0.0
 
-    def __post_init__(self):
+    def __post_init__(self) -> None:
         if not self.timestamp:
             self.timestamp = datetime.now(timezone.utc).isoformat()
 
@@ -51,7 +51,7 @@ class EscalationCreatedEvent(ObservabilityEvent):
     reason: str = ""
     expires_at: str = ""
 
-    def __post_init__(self):
+    def __post_init__(self) -> None:
         if not self.timestamp:
             self.timestamp = datetime.now(timezone.utc).isoformat()
 
@@ -66,7 +66,7 @@ class EscalationResolvedEvent(ObservabilityEvent):
     resolution: str = ""  # approved, denied
     duration_ms: float = 0.0
 
-    def __post_init__(self):
+    def __post_init__(self) -> None:
         if not self.timestamp:
             self.timestamp = datetime.now(timezone.utc).isoformat()
 
@@ -79,7 +79,7 @@ class PolicyLoadedEvent(ObservabilityEvent):
     policy_version: str = ""
     rule_count: int = 0
 
-    def __post_init__(self):
+    def __post_init__(self) -> None:
         if not self.timestamp:
             self.timestamp = datetime.now(timezone.utc).isoformat()
 
@@ -96,7 +96,7 @@ class SessionSummaryEvent(ObservabilityEvent):
     escalations: int = 0
     tools_used: list = field(default_factory=list)
 
-    def __post_init__(self):
+    def __post_init__(self) -> None:
         if not self.timestamp:
             self.timestamp = datetime.now(timezone.utc).isoformat()
 

@@ -90,7 +90,7 @@ class S3PolicyStore:
         self.prefix = prefix
         self._s3_client = None
 
-    def _get_s3_client(self):
+    def _get_s3_client(self) -> Any:
         """Lazy-load boto3 S3 client."""
         if self._s3_client is None:
             try:
@@ -295,7 +295,7 @@ class GCSPolicyStore:
         self.prefix = prefix
         self._gcs_client = None
 
-    def _get_gcs_client(self):
+    def _get_gcs_client(self) -> Any:
         """Lazy-load GCS client."""
         if self._gcs_client is None:
             try:
@@ -476,7 +476,7 @@ class PolicyLoader:
 _policy_loader: Optional[PolicyLoader] = None
 
 
-def register_policy_store(backend: str = "filesystem", **kwargs) -> PolicyLoader:
+def register_policy_store(backend: str = "filesystem", **kwargs: Any) -> PolicyLoader:
     """
     Register a global policy store for use with load_customer_policy().
 
@@ -493,6 +493,7 @@ def register_policy_store(backend: str = "filesystem", **kwargs) -> PolicyLoader
     """
     global _policy_loader
 
+    store: PolicyStore
     if backend == "filesystem":
         base_path = kwargs.get("base_path", "./policies")
         store = FilesystemPolicyStore(base_path=base_path)
@@ -552,6 +553,6 @@ def load_customer_policy(customer_id: str) -> dict[str, Any]:
 
     if _policy_loader is None:
         # Auto-register filesystem backend as default
-        register_policy_store(backend="filesystem")
+        _policy_loader = register_policy_store(backend="filesystem")
 
     return _policy_loader.load(customer_id)

@@ -8,6 +8,7 @@ from __future__ import annotations
 
 from typing import Optional
 
+from ..sinks.base import AuditSink
 from .schema import AuditRecord
 
 
@@ -18,7 +19,7 @@ class AuditWriter:
     Handles async/sync writing and error handling.
     """
 
-    def __init__(self, sinks: Optional[list] = None):
+    def __init__(self, sinks: Optional[list[AuditSink]] = None):
         """
         Initialize audit writer.
 
@@ -46,11 +47,11 @@ class AuditWriter:
                 # In production, this should use proper logging
                 print(f"Error writing to sink {sink.__class__.__name__}: {e}")
 
-    def add_sink(self, sink) -> None:
+    def add_sink(self, sink: AuditSink) -> None:
         """Add a sink to the writer."""
         self.sinks.append(sink)
 
-    def remove_sink(self, sink) -> None:
+    def remove_sink(self, sink: AuditSink) -> None:
         """Remove a sink from the writer."""
         if sink in self.sinks:
             self.sinks.remove(sink)

@@ -56,7 +56,7 @@ class ToolWrapper:
         # Preserve original function metadata
         functools.update_wrapper(self, tool)
 
-    def __call__(self, *args, **kwargs) -> Any:
+    def __call__(self, *args: Any, **kwargs: Any) -> Any:
         """
         Execute tool with policy enforcement.
 
@@ -107,7 +107,7 @@ class ToolWrapper:
                 tool_name=tool_name,
                 params=params,
                 outcome="deny",
-                matched_rule=decision.matched_rule,
+                matched_rule=decision.matched_rule or "",
                 reason=decision.reason,
                 latency_ms=latency_ms,
             )
@@ -132,7 +132,7 @@ class ToolWrapper:
                 tool_name=tool_name,
                 params=params,
                 outcome="escalate",
-                matched_rule=decision.matched_rule,
+                matched_rule=decision.matched_rule or "",
                 reason=decision.reason,
                 latency_ms=latency_ms,
             )
@@ -189,7 +189,7 @@ class ToolWrapper:
                 tool_name=tool_name,
                 params=params,
                 outcome="allow",
-                matched_rule=decision.matched_rule,
+                matched_rule=decision.matched_rule or "",
                 reason=decision.reason,
                 execution_result=result if not execution_error else None,
                 execution_error=execution_error,
@@ -210,8 +210,8 @@ def wrap(
     session_id: Optional[str] = None,
     on_deny: str = "raise",
     on_escalate: str = "block",
-    audit_sink=None,
-    obs_sink=None,
+    audit_sink: Any = None,
+    obs_sink: Any = None,
     escalation_webhook: Optional[str] = None,
     escalation_timeout_minutes: int = 30,
 ) -> list[Callable]:
@@ -299,7 +299,7 @@ def wrap(
             audit_writer = AuditWriter(sinks=[audit_sink])
 
     # Wrap each tool
-    wrapped = []
+    wrapped: list[Callable] = []
     for tool in tools:
         wrapper = ToolWrapper(
             tool=tool,
@@ -321,7 +321,7 @@ def wrap_function_map(
     policy: Union[str, dict[str, Any]],
     agent_id: str,
     customer_id: Optional[str] = None,
-    **kwargs,
+    **kwargs: Any,
 ) -> dict[str, Callable]:
     """
     Wrap a dictionary of functions (for raw OpenAI function calling).

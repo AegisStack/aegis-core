@@ -87,13 +87,14 @@ We use the tools configured in `pyproject.toml`:
 ```bash
 black aegis tests          # format (line length 100)
 ruff check aegis tests     # lint
-mypy aegis                 # type check (not yet enforced in CI — see note below)
+mypy aegis                 # type check (enforced in CI and pre-commit)
 ```
 
-> Note: `mypy` is not currently run in CI or the pre-commit hook. The SDK still
-> has missing type annotations to add before it can pass cleanly. Running it
-> locally and chipping away at the errors is welcome; it will be re-enabled as a
-> required check once the codebase is clean.
+> Note: `mypy` runs in CI and as a pre-commit hook. It type-checks the whole
+> `aegis` package (type-checking cannot be scoped to staged files, since a
+> staged file's types depend on files you did not stage). Install the dev extra
+> (`pip install -e ".[dev]"`) so the type stubs (`types-PyYAML`,
+> `types-requests`) are available.
 
 - All public functions must have type annotations (`disallow_untyped_defs` is on).
 - Keep changes consistent with the surrounding code style.

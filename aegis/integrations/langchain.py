@@ -16,7 +16,7 @@ def wrap_langchain_tools(
     policy: Union[str, dict[str, Any]],
     agent_id: str,
     customer_id: Optional[str] = None,
-    **kwargs,
+    **kwargs: Any,
 ) -> list[Any]:
     """
     Wrap LangChain Tool objects with policy enforcement.

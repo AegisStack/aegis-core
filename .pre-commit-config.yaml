@@ -25,21 +25,43 @@ repos:
         args: [--check]
         files: ^(aegis/|tests/|aegis-dashboard/backend/)
 
-  # NOTE: mypy is intentionally omitted for now (matches lint.yml). The SDK has
-  # ~31 missing type annotations to add before it can pass; reintroduce a mypy
-  # hook here once those are resolved.
+  # mypy for the SDK. Unlike ruff/black above, type-checking is whole-project
+  # (a staged file's types depend on files you did not stage), so we cannot
+  # scope it to staged paths: pass_filenames: false runs it over the whole
+  # `aegis` package whenever any Python file under aegis/ is staged.
+  #
+  # Runs via the local interpreter (language: system) rather than the mypy
+  # mirror's isolated venv: on Windows the mirror's virtualenv build trips the
+  # MAX_PATH limit (WinError 206) on setuptools' vendored files. That means the
+  # interpreter must have the type stubs installed — get them (plus mypy and the
+  # package's runtime deps) with:  pip install -e ".[dev]"
+  - repo: local
+    hooks:
+      - id: mypy
+        name: mypy (SDK, whole-project)
+        entry: python -m mypy aegis
+        language: system
+        pass_filenames: false
+        files: ^aegis/.*\.py$
 
   # ---- Frontend: Next.js / TypeScript ----
   # ESLint runs only on the staged frontend files. pre-commit hands us
   # repo-relative paths (aegis-dashboard/frontend/...); we cd into the package
   # and strip that prefix so eslint resolves them against its own config.
+  #
+  # We collect the stripped paths into an array, dropping any that come back
+  # empty, and exit early if nothing is left. Passing an empty string to eslint
+  # makes it abort the whole batch with "'patterns' must be a non-empty string",
+  # so an empty arg must never reach it.
   - repo: local
     hooks:
       - id: frontend-eslint
         name: eslint (frontend, staged files only)
-        entry: bash -c 'cd aegis-dashboard/frontend && exec npx --no-install eslint "${@#aegis-dashboard/frontend/}"' --
+        entry: bash -c 'cd aegis-dashboard/frontend && args=(); for f in "$@"; do f="${f#aegis-dashboard/frontend/}"; [ -n "$f" ] && args+=("$f"); done; [ ${#args[@]} -eq 0 ] && exit 0; exec npx --no-install eslint "${args[@]}"' --
         language: system
         files: ^aegis-dashboard/frontend/.*\.(ts|tsx|js|jsx)$
+        # Never lint dependencies, even if one is somehow staged.
+        exclude: ^aegis-dashboard/frontend/node_modules/
         # tsc type-checking is intentionally NOT a pre-commit hook: it is
         # whole-project (a staged file's types depend on files you did not
         # stage), so it cannot be scoped to staged files. It runs in CI only.

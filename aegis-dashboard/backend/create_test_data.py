@@ -1,10 +1,14 @@
 """Quick script to create test data - run inside container"""
+
 import asyncio
-from app.database import get_db
-from app.models.user import User
-from app.models.policy import Customer
-from app.services.auth import get_password_hash
+
 from sqlalchemy import select
+
+from app.database import get_db
+from app.models.policy import Customer
+from app.models.user import User
+from app.services.auth import get_password_hash
+
 
 async def main():
     async for db in get_db():
@@ -22,9 +26,7 @@ async def main():
 
         # Create customer
         customer = Customer(
-            customer_id="test_customer",
-            name="Test Company",
-            api_key="test_api_key_12345"
+            customer_id="test_customer", name="Test Company", api_key="test_api_key_12345"
         )
         db.add(customer)
         await db.flush()
@@ -37,7 +39,7 @@ async def main():
             customer_id="test_customer",
             role="admin",
             is_active=True,
-            is_verified=True
+            is_verified=True,
         )
         operator = User(
             email="operator@test.com",
@@ -46,7 +48,7 @@ async def main():
             customer_id="test_customer",
             role="operator",
             is_active=True,
-            is_verified=True
+            is_verified=True,
         )
         viewer = User(
             email="viewer@test.com",
@@ -55,7 +57,7 @@ async def main():
             customer_id="test_customer",
             role="viewer",
             is_active=True,
-            is_verified=True
+            is_verified=True,
         )
         db.add_all([admin, operator, viewer])
         await db.commit()
@@ -67,6 +69,7 @@ async def main():
         print("  Viewer:   viewer@test.com / viewer123")
         print("\nAPI Key: test_api_key_12345")
         break
+
 
 if __name__ == "__main__":
     asyncio.run(main())

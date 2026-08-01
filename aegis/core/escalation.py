@@ -134,6 +134,8 @@ class EscalationManager:
 
     def _send_webhook(self, escalation: EscalationRequest) -> None:
         """Send escalation webhook notification."""
+        if not self.webhook_url:
+            return
         payload = {
             "type": "escalation_request",
             "escalation_id": escalation.escalation_id,

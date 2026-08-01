@@ -43,6 +43,7 @@ from app.services.auth import get_password_hash
 
 # ── helpers ──────────────────────────────────────────────────────────────────
 
+
 def _hash(yaml_text: str) -> str:
     return hashlib.sha256(yaml_text.encode()).hexdigest()
 
@@ -274,90 +275,152 @@ defaults:
 # ── audit + escalation data tables ───────────────────────────────────────────
 
 RULES_DENY = [
-    "no_pii_in_email", "rate_limit_exceeded", "privileged_action",
-    "outside_business_hours", "missing_approval", "data_exfiltration_risk",
-    "amount_exceeds_limit", "restricted_bucket", "dangerous_query_type",
+    "no_pii_in_email",
+    "rate_limit_exceeded",
+    "privileged_action",
+    "outside_business_hours",
+    "missing_approval",
+    "data_exfiltration_risk",
+    "amount_exceeds_limit",
+    "restricted_bucket",
+    "dangerous_query_type",
 ]
 
 # Realistic agent -> (tool, outcome_weights, sample_params) mappings
 AGENT_TOOLS: dict[str, list[dict]] = {
     "billing-agent": [
-        {"tool": "issue_refund",  "weights": [75, 15, 10],
-         "allow_params":   {"amount_usd": 50,   "customer_id": "cust_001"},
-         "deny_params":    {"amount_usd": 750,  "customer_id": "cust_002"},
-         "esc_params":     {"amount_usd": 350,  "customer_id": "cust_003"},
-         "deny_rule": "amount_exceeds_limit", "esc_rule": "high_value_transaction"},
-        {"tool": "send_email",    "weights": [80, 20,  0],
-         "allow_params":   {"recipient": "user@acme.com",     "subject": "Invoice"},
-         "deny_params":    {"recipient": "user@external.com", "subject": "Invoice"},
-         "esc_params":     {},
-         "deny_rule": "no_pii_in_email", "esc_rule": "external_email_recipient"},
-        {"tool": "update_crm",    "weights": [90, 10,  0],
-         "allow_params":   {"record_id": "CRM-123", "field": "phone"},
-         "deny_params":    {"record_id": "CRM-999", "field": "salary"},
-         "esc_params":     {},
-         "deny_rule": "privileged_action", "esc_rule": "high_value_transaction"},
+        {
+            "tool": "issue_refund",
+            "weights": [75, 15, 10],
+            "allow_params": {"amount_usd": 50, "customer_id": "cust_001"},
+            "deny_params": {"amount_usd": 750, "customer_id": "cust_002"},
+            "esc_params": {"amount_usd": 350, "customer_id": "cust_003"},
+            "deny_rule": "amount_exceeds_limit",
+            "esc_rule": "high_value_transaction",
+        },
+        {
+            "tool": "send_email",
+            "weights": [80, 20, 0],
+            "allow_params": {"recipient": "user@acme.com", "subject": "Invoice"},
+            "deny_params": {"recipient": "user@external.com", "subject": "Invoice"},
+            "esc_params": {},
+            "deny_rule": "no_pii_in_email",
+            "esc_rule": "external_email_recipient",
+        },
+        {
+            "tool": "update_crm",
+            "weights": [90, 10, 0],
+            "allow_params": {"record_id": "CRM-123", "field": "phone"},
+            "deny_params": {"record_id": "CRM-999", "field": "salary"},
+            "esc_params": {},
+            "deny_rule": "privileged_action",
+            "esc_rule": "high_value_transaction",
+        },
     ],
     "support-agent": [
-        {"tool": "close_ticket",  "weights": [65, 15, 20],
-         "allow_params":   {"ticket_id": "TKT-100", "status": "resolved"},
-         "deny_params":    {"ticket_id": "TKT-200", "status": "deleted"},
-         "esc_params":     {"ticket_id": "TKT-300", "status": "pending"},
-         "deny_rule": "privileged_action", "esc_rule": "pending_ticket_close"},
-        {"tool": "send_email",    "weights": [85, 15,  0],
-         "allow_params":   {"recipient": "agent@acme.com",   "subject": "Update"},
-         "deny_params":    {"recipient": "user@outlook.com", "subject": "Update"},
-         "esc_params":     {},
-         "deny_rule": "no_pii_in_email", "esc_rule": "external_email_recipient"},
-        {"tool": "read_ticket",   "weights": [99,  1,  0],
-         "allow_params":   {"ticket_id": "TKT-400"},
-         "deny_params":    {"ticket_id": "TKT-401"},
-         "esc_params":     {},
-         "deny_rule": "rate_limit_exceeded", "esc_rule": "pending_ticket_close"},
-        {"tool": "delete_ticket", "weights": [ 0, 100, 0],
-         "allow_params":   {},
-         "deny_params":    {"ticket_id": "TKT-500"},
-         "esc_params":     {},
-         "deny_rule": "privileged_action", "esc_rule": "pending_ticket_close"},
+        {
+            "tool": "close_ticket",
+            "weights": [65, 15, 20],
+            "allow_params": {"ticket_id": "TKT-100", "status": "resolved"},
+            "deny_params": {"ticket_id": "TKT-200", "status": "deleted"},
+            "esc_params": {"ticket_id": "TKT-300", "status": "pending"},
+            "deny_rule": "privileged_action",
+            "esc_rule": "pending_ticket_close",
+        },
+        {
+            "tool": "send_email",
+            "weights": [85, 15, 0],
+            "allow_params": {"recipient": "agent@acme.com", "subject": "Update"},
+            "deny_params": {"recipient": "user@outlook.com", "subject": "Update"},
+            "esc_params": {},
+            "deny_rule": "no_pii_in_email",
+            "esc_rule": "external_email_recipient",
+        },
+        {
+            "tool": "read_ticket",
+            "weights": [99, 1, 0],
+            "allow_params": {"ticket_id": "TKT-400"},
+            "deny_params": {"ticket_id": "TKT-401"},
+            "esc_params": {},
+            "deny_rule": "rate_limit_exceeded",
+            "esc_rule": "pending_ticket_close",
+        },
+        {
+            "tool": "delete_ticket",
+            "weights": [0, 100, 0],
+            "allow_params": {},
+            "deny_params": {"ticket_id": "TKT-500"},
+            "esc_params": {},
+            "deny_rule": "privileged_action",
+            "esc_rule": "pending_ticket_close",
+        },
     ],
     "analytics-agent": [
-        {"tool": "query_database","weights": [70, 25,  5],
-         "allow_params":   {"query_type": "SELECT", "table": "orders"},
-         "deny_params":    {"query_type": "DROP",   "table": "users"},
-         "esc_params":     {"query_type": "SELECT", "table": "pii_data"},
-         "deny_rule": "dangerous_query_type", "esc_rule": "data_exfiltration_risk"},
-        {"tool": "export_report", "weights": [60, 10, 30],
-         "allow_params":   {"format": "csv", "destination": "internal", "rows": 1000},
-         "deny_params":    {"format": "csv", "destination": "external", "rows": 1000000},
-         "esc_params":     {"format": "csv", "destination": "external", "rows": 50000},
-         "deny_rule": "data_exfiltration_risk", "esc_rule": "external_destination"},
-        {"tool": "access_s3",    "weights": [75, 25,  0],
-         "allow_params":   {"bucket": "acme-reports", "key": "q3.csv"},
-         "deny_params":    {"bucket": "acme-billing",  "key": "payroll.csv"},
-         "esc_params":     {},
-         "deny_rule": "restricted_bucket", "esc_rule": "data_exfiltration_risk"},
+        {
+            "tool": "query_database",
+            "weights": [70, 25, 5],
+            "allow_params": {"query_type": "SELECT", "table": "orders"},
+            "deny_params": {"query_type": "DROP", "table": "users"},
+            "esc_params": {"query_type": "SELECT", "table": "pii_data"},
+            "deny_rule": "dangerous_query_type",
+            "esc_rule": "data_exfiltration_risk",
+        },
+        {
+            "tool": "export_report",
+            "weights": [60, 10, 30],
+            "allow_params": {"format": "csv", "destination": "internal", "rows": 1000},
+            "deny_params": {"format": "csv", "destination": "external", "rows": 1000000},
+            "esc_params": {"format": "csv", "destination": "external", "rows": 50000},
+            "deny_rule": "data_exfiltration_risk",
+            "esc_rule": "external_destination",
+        },
+        {
+            "tool": "access_s3",
+            "weights": [75, 25, 0],
+            "allow_params": {"bucket": "acme-reports", "key": "q3.csv"},
+            "deny_params": {"bucket": "acme-billing", "key": "payroll.csv"},
+            "esc_params": {},
+            "deny_rule": "restricted_bucket",
+            "esc_rule": "data_exfiltration_risk",
+        },
     ],
     "ops-agent": [
-        {"tool": "restart_service","weights": [50, 10, 40],
-         "allow_params":   {"service": "nginx",            "environment": "staging"},
-         "deny_params":    {"service": "payment-processor","environment": "staging"},
-         "esc_params":     {"service": "payment-processor","environment": "production"},
-         "deny_rule": "missing_approval", "esc_rule": "production_environment"},
-        {"tool": "read_file",    "weights": [99,  1,  0],
-         "allow_params":   {"path": "/var/log/nginx.log"},
-         "deny_params":    {"path": "/etc/shadow"},
-         "esc_params":     {},
-         "deny_rule": "privileged_action", "esc_rule": "production_environment"},
-        {"tool": "write_file",   "weights": [60, 10, 30],
-         "allow_params":   {"path": "/tmp/output.txt", "size_bytes": 512},
-         "deny_params":    {"path": "/etc/cron.d/job", "size_bytes": 128},
-         "esc_params":     {"path": "/etc/nginx/nginx.conf", "size_bytes": 4096},
-         "deny_rule": "privileged_action", "esc_rule": "production_environment"},
-        {"tool": "execute_code", "weights": [ 0, 100, 0],
-         "allow_params":   {},
-         "deny_params":    {"script": "rm -rf /tmp/*"},
-         "esc_params":     {},
-         "deny_rule": "privileged_action", "esc_rule": "production_environment"},
+        {
+            "tool": "restart_service",
+            "weights": [50, 10, 40],
+            "allow_params": {"service": "nginx", "environment": "staging"},
+            "deny_params": {"service": "payment-processor", "environment": "staging"},
+            "esc_params": {"service": "payment-processor", "environment": "production"},
+            "deny_rule": "missing_approval",
+            "esc_rule": "production_environment",
+        },
+        {
+            "tool": "read_file",
+            "weights": [99, 1, 0],
+            "allow_params": {"path": "/var/log/nginx.log"},
+            "deny_params": {"path": "/etc/shadow"},
+            "esc_params": {},
+            "deny_rule": "privileged_action",
+            "esc_rule": "production_environment",
+        },
+        {
+            "tool": "write_file",
+            "weights": [60, 10, 30],
+            "allow_params": {"path": "/tmp/output.txt", "size_bytes": 512},
+            "deny_params": {"path": "/etc/cron.d/job", "size_bytes": 128},
+            "esc_params": {"path": "/etc/nginx/nginx.conf", "size_bytes": 4096},
+            "deny_rule": "privileged_action",
+            "esc_rule": "production_environment",
+        },
+        {
+            "tool": "execute_code",
+            "weights": [0, 100, 0],
+            "allow_params": {},
+            "deny_params": {"script": "rm -rf /tmp/*"},
+            "esc_params": {},
+            "deny_rule": "privileged_action",
+            "esc_rule": "production_environment",
+        },
     ],
 }
 
@@ -365,6 +428,7 @@ AGENTS = list(AGENT_TOOLS.keys())
 
 
 # ── seed functions ────────────────────────────────────────────────────────────
+
 
 async def seed_customer(session: AsyncSession, cfg: dict):
     existing = await session.execute(
@@ -374,23 +438,27 @@ async def seed_customer(session: AsyncSession, cfg: dict):
         print(f"  [skip] {cfg['customer_id']} already exists")
         return
 
-    session.add(Customer(
-        customer_id=cfg["customer_id"],
-        name=cfg["name"],
-        api_key=cfg["api_key"],
-    ))
+    session.add(
+        Customer(
+            customer_id=cfg["customer_id"],
+            name=cfg["name"],
+            api_key=cfg["api_key"],
+        )
+    )
     await session.flush()
 
     for email, full_name, role, password in cfg["users"]:
-        session.add(User(
-            email=email,
-            full_name=full_name,
-            hashed_password=get_password_hash(password),
-            customer_id=cfg["customer_id"],
-            role=role,
-            is_active=True,
-            is_verified=True,
-        ))
+        session.add(
+            User(
+                email=email,
+                full_name=full_name,
+                hashed_password=get_password_hash(password),
+                customer_id=cfg["customer_id"],
+                role=role,
+                is_active=True,
+                is_verified=True,
+            )
+        )
 
     print(f"  [ok]   {cfg['customer_id']} — {len(cfg['users'])} users")
 
@@ -402,18 +470,20 @@ async def seed_policies(session: AsyncSession, customer_id: str):
         agent_id = agent_cfg["agent_id"]
         versions = agent_cfg["versions"]
         for i, v in enumerate(versions):
-            is_active = (i == len(versions) - 1)  # only the last version is active
-            session.add(Policy(
-                customer_id=customer_id,
-                agent_id=agent_id,
-                policy_yaml=v["yaml"],
-                policy_hash=_hash(v["yaml"]),
-                version=i + 1,
-                is_active=is_active,
-                created_at=_ago(days=30 - i * 7),   # older versions further back
-                created_by=f"admin@{customer_id}",
-                description=v["description"],
-            ))
+            is_active = i == len(versions) - 1  # only the last version is active
+            session.add(
+                Policy(
+                    customer_id=customer_id,
+                    agent_id=agent_id,
+                    policy_yaml=v["yaml"],
+                    policy_hash=_hash(v["yaml"]),
+                    version=i + 1,
+                    is_active=is_active,
+                    created_at=_ago(days=30 - i * 7),  # older versions further back
+                    created_by=f"admin@{customer_id}",
+                    description=v["description"],
+                )
+            )
             total += 1
     print(f"  [ok]   {customer_id} — {total} policy versions across {len(agent_configs)} agents")
 
@@ -425,6 +495,7 @@ async def seed_audit_and_escalations(session: AsyncSession, customer_id: str, n_
       ~40% in the last 2 hours (for time-series charts), ~60% spread over last 7 days.
     - Escalation records distributed across statuses.
     """
+
     # ── regular records ───────────────────────────────────────────────────────
     # Weight timestamps: recent records are more likely so time-series charts have data
     def _random_ts() -> datetime:
@@ -450,33 +521,41 @@ async def seed_audit_and_escalations(session: AsyncSession, customer_id: str, n_
             matched_rule = tool_cfg["esc_rule"]
             reason = f"{tool_cfg['tool']} requires human review: {matched_rule.replace('_', ' ')}"
 
-        session.add(AuditRecord(
-            record_id=uuid.uuid4(),
-            timestamp=_random_ts(),
-            customer_id=customer_id,
-            agent_id=agent_id,
-            session_id=str(uuid.uuid4()),
-            policy_version="2.0",
-            tool_name=tool_cfg["tool"],
-            params=params,
-            outcome=outcome,
-            matched_rule=matched_rule,
-            reason=reason,
-            latency_ms=round(random.gauss(18, 10), 2),
-        ))
+        session.add(
+            AuditRecord(
+                record_id=uuid.uuid4(),
+                timestamp=_random_ts(),
+                customer_id=customer_id,
+                agent_id=agent_id,
+                session_id=str(uuid.uuid4()),
+                policy_version="2.0",
+                tool_name=tool_cfg["tool"],
+                params=params,
+                outcome=outcome,
+                matched_rule=matched_rule,
+                reason=reason,
+                latency_ms=round(random.gauss(18, 10), 2),
+            )
+        )
 
     # ── escalation scenarios ──────────────────────────────────────────────────
     # status distribution: some pending (fresh), some approved, some denied, some expired
     esc_statuses = [
-        ("pending",  _ago(minutes=10),  _from_now(minutes=20),  None,          None),
-        ("pending",  _ago(minutes=25),  _from_now(minutes=5),   None,          None),
-        ("pending",  _ago(hours=1),     _from_now(hours=23),    None,          None),
-        ("approved", _ago(hours=3),     _from_now(hours=21),    "operator@" + customer_id, _ago(hours=2)),
-        ("approved", _ago(days=1),      _ago(hours=20),         "admin@" + customer_id,    _ago(days=1, hours=-2)),
-        ("denied",   _ago(hours=5),     _from_now(hours=19),    "operator@" + customer_id, _ago(hours=4)),
-        ("denied",   _ago(days=2),      _ago(days=2, hours=-24),"admin@" + customer_id,    _ago(days=2, hours=-1)),
-        ("expired",  _ago(days=3),      _ago(days=2, hours=22), None,          None),
-        ("expired",  _ago(days=5),      _ago(days=4, hours=20), None,          None),
+        ("pending", _ago(minutes=10), _from_now(minutes=20), None, None),
+        ("pending", _ago(minutes=25), _from_now(minutes=5), None, None),
+        ("pending", _ago(hours=1), _from_now(hours=23), None, None),
+        ("approved", _ago(hours=3), _from_now(hours=21), "operator@" + customer_id, _ago(hours=2)),
+        ("approved", _ago(days=1), _ago(hours=20), "admin@" + customer_id, _ago(days=1, hours=-2)),
+        ("denied", _ago(hours=5), _from_now(hours=19), "operator@" + customer_id, _ago(hours=4)),
+        (
+            "denied",
+            _ago(days=2),
+            _ago(days=2, hours=-24),
+            "admin@" + customer_id,
+            _ago(days=2, hours=-1),
+        ),
+        ("expired", _ago(days=3), _ago(days=2, hours=22), None, None),
+        ("expired", _ago(days=5), _ago(days=4, hours=20), None, None),
     ]
 
     # Flatten all escalation-capable tools across agents for use in esc rows
@@ -494,43 +573,49 @@ async def seed_audit_and_escalations(session: AsyncSession, customer_id: str, n_
         agent_id = scenario["agent_id"]
 
         esc_params = scenario["esc_params"] or scenario["allow_params"]
-        esc_reason = f"{scenario['tool']} requires human review: {scenario['esc_rule'].replace('_', ' ')}"
+        esc_reason = (
+            f"{scenario['tool']} requires human review: {scenario['esc_rule'].replace('_', ' ')}"
+        )
 
         # Audit record
-        session.add(AuditRecord(
-            record_id=record_id,
-            timestamp=created_at,
-            customer_id=customer_id,
-            agent_id=agent_id,
-            session_id=str(uuid.uuid4()),
-            policy_version="2.0",
-            tool_name=scenario["tool"],
-            params=esc_params,
-            outcome="escalate",
-            matched_rule=scenario["esc_rule"],
-            reason=esc_reason,
-            escalation_id=esc_id,
-            resolved_by=resolved_by,
-            resolution=status if status in ("approved", "denied") else None,
-            resolution_timestamp=res_ts,
-            latency_ms=round(random.uniform(2.0, 50.0), 2),
-        ))
+        session.add(
+            AuditRecord(
+                record_id=record_id,
+                timestamp=created_at,
+                customer_id=customer_id,
+                agent_id=agent_id,
+                session_id=str(uuid.uuid4()),
+                policy_version="2.0",
+                tool_name=scenario["tool"],
+                params=esc_params,
+                outcome="escalate",
+                matched_rule=scenario["esc_rule"],
+                reason=esc_reason,
+                escalation_id=esc_id,
+                resolved_by=resolved_by,
+                resolution=status if status in ("approved", "denied") else None,
+                resolution_timestamp=res_ts,
+                latency_ms=round(random.uniform(2.0, 50.0), 2),
+            )
+        )
 
         # Escalation row
-        session.add(Escalation(
-            escalation_id=esc_id,
-            record_id=record_id,
-            customer_id=customer_id,
-            agent_id=agent_id,
-            tool_name=scenario["tool"],
-            params=esc_params,
-            reason=esc_reason,
-            status=status,
-            resolved_by=resolved_by,
-            resolution_timestamp=res_ts,
-            created_at=created_at,
-            expires_at=expires_at,
-        ))
+        session.add(
+            Escalation(
+                escalation_id=esc_id,
+                record_id=record_id,
+                customer_id=customer_id,
+                agent_id=agent_id,
+                tool_name=scenario["tool"],
+                params=esc_params,
+                reason=esc_reason,
+                status=status,
+                resolved_by=resolved_by,
+                resolution_timestamp=res_ts,
+                created_at=created_at,
+                expires_at=expires_at,
+            )
+        )
 
     pending = sum(1 for s, *_ in esc_statuses if s == "pending")
     print(
@@ -547,9 +632,9 @@ CUSTOMERS = [
         "name": "Acme Corporation",
         "api_key": "acme_api_key_abc123",
         "users": [
-            ("admin@acme.com",    "Admin User",    "admin",    "acme_admin_pass"),
+            ("admin@acme.com", "Admin User", "admin", "acme_admin_pass"),
             ("operator@acme.com", "Operator User", "operator", "acme_op_pass"),
-            ("viewer@acme.com",   "Viewer User",   "viewer",   "acme_view_pass"),
+            ("viewer@acme.com", "Viewer User", "viewer", "acme_view_pass"),
         ],
         "audit_records": 400,
     },
@@ -558,7 +643,7 @@ CUSTOMERS = [
         "name": "Beta Industries",
         "api_key": "beta_api_key_xyz789",
         "users": [
-            ("admin@beta.com",  "Beta Admin",  "admin",  "beta_admin_pass"),
+            ("admin@beta.com", "Beta Admin", "admin", "beta_admin_pass"),
             ("viewer@beta.com", "Beta Viewer", "viewer", "beta_view_pass"),
         ],
         "audit_records": 200,
@@ -568,9 +653,9 @@ CUSTOMERS = [
         "name": "Test Company",
         "api_key": "test_api_key_12345",
         "users": [
-            ("admin@test.com",    "Admin User",    "admin",    "admin123"),
+            ("admin@test.com", "Admin User", "admin", "admin123"),
             ("operator@test.com", "Operator User", "operator", "operator123"),
-            ("viewer@test.com",   "Viewer User",   "viewer",   "viewer123"),
+            ("viewer@test.com", "Viewer User", "viewer", "viewer123"),
         ],
         "audit_records": 150,
     },
@@ -578,6 +663,7 @@ CUSTOMERS = [
 
 
 # ── entry point ───────────────────────────────────────────────────────────────
+
 
 async def init_database():
     db_url = os.getenv(
@@ -608,9 +694,7 @@ async def init_database():
         print("\nSeeding audit records & escalations ...")
         async with async_session() as session:
             for cfg in CUSTOMERS:
-                await seed_audit_and_escalations(
-                    session, cfg["customer_id"], cfg["audit_records"]
-                )
+                await seed_audit_and_escalations(session, cfg["customer_id"], cfg["audit_records"])
             await session.commit()
 
         print("\nDone.\n")

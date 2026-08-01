@@ -119,6 +119,6 @@ class AegisDashboardSink:
             self._stop_event.set()
             self._worker_thread.join(timeout=5)
 
-    def __del__(self):
+    def __del__(self) -> None:
         """Ensure cleanup on deletion."""
         self.close()

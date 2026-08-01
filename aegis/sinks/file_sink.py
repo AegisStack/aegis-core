@@ -6,7 +6,7 @@ from __future__ import annotations
 
 from datetime import datetime
 from pathlib import Path
-from typing import Optional
+from typing import Optional, TextIO
 
 from ..audit.schema import AuditRecord
 
@@ -35,9 +35,9 @@ class FileSink:
         self.base_path = Path(path)
         self.rotate = rotate
         self.buffer_size = buffer_size
-        self._buffer = []
-        self._current_file = None
-        self._current_date = None
+        self._buffer: list[AuditRecord] = []
+        self._current_file: Optional[TextIO] = None
+        self._current_date: Optional[str] = None
 
         # Create directory if it doesn't exist
         self.base_path.parent.mkdir(parents=True, exist_ok=True)
@@ -107,6 +107,6 @@ class FileSink:
             self._current_file.close()
             self._current_file = None
 
-    def __del__(self):
+    def __del__(self) -> None:
         """Ensure file is closed on deletion."""
         self.close()
