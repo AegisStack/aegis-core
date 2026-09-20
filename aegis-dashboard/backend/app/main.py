@@ -6,11 +6,14 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from slowapi.errors import RateLimitExceeded
+from slowapi.middleware import SlowAPIMiddleware
 
 from .api import websocket
 from .api.v1 import audit, auth, escalations, ingest, metrics, policies
 from .config import get_settings
 from .database import close_db
+from .rate_limit import limiter, rate_limit_exceeded_handler
 from .redis_client import close_redis
 
 settings = get_settings()
@@ -35,6 +38,11 @@ app = FastAPI(
     description="Aegis Cloud Dashboard API for policy enforcement observability",
     lifespan=lifespan,
 )
+
+# Rate limiting
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, rate_limit_exceeded_handler)
+app.add_middleware(SlowAPIMiddleware)
 
 # CORS middleware
 app.add_middleware(

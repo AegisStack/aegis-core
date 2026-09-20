@@ -38,6 +38,9 @@ class Settings(BaseSettings):
 
     # Rate Limiting
     rate_limit_per_minute: int = 100
+    # Stricter limit for /auth/login and /auth/register - brute-force
+    # protection, not general API throughput.
+    auth_rate_limit_per_minute: int = 10
 
     # Batch Writing
     batch_size: int = 100

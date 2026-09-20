@@ -4,7 +4,7 @@ Authentication API endpoints.
 
 from datetime import datetime
 
-from fastapi import APIRouter, Body, Depends, HTTPException, status
+from fastapi import APIRouter, Body, Depends, HTTPException, Request, status
 from pydantic import BaseModel, EmailStr
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -12,6 +12,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from ...config import get_settings
 from ...database import get_db
 from ...models.user import User
+from ...rate_limit import limiter
 from ...services.auth import (
     create_access_token,
     create_refresh_token,
@@ -84,7 +85,8 @@ class UserResponse(BaseModel):
 
 
 @router.post("/auth/register", response_model=TokenResponse, status_code=201)
-async def register(data: RegisterRequest, db: AsyncSession = Depends(get_db)):
+@limiter.limit(f"{settings.auth_rate_limit_per_minute}/minute")
+async def register(request: Request, data: RegisterRequest, db: AsyncSession = Depends(get_db)):
     """
     Register a new user.
 
@@ -125,7 +127,8 @@ async def register(data: RegisterRequest, db: AsyncSession = Depends(get_db)):
 
 
 @router.post("/auth/login", response_model=TokenResponse)
-async def login(data: LoginRequest, db: AsyncSession = Depends(get_db)):
+@limiter.limit(f"{settings.auth_rate_limit_per_minute}/minute")
+async def login(request: Request, data: LoginRequest, db: AsyncSession = Depends(get_db)):
     """
     Login with email and password.
 

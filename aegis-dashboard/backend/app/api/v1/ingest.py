@@ -2,16 +2,19 @@
 Ingestion API - Receives audit records from SDK.
 """
 
-from fastapi import APIRouter, Depends, Header, HTTPException
+from fastapi import APIRouter, Depends, Header, HTTPException, Request
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from ...config import get_settings
 from ...database import get_db
 from ...models import AuditRecord, Customer
+from ...rate_limit import limiter
 from ...schemas import AuditRecordCreate
 from ...services.auth import hash_api_key
 
 router = APIRouter()
+settings = get_settings()
 
 
 async def verify_api_key(x_api_key: str = Header(...), db: AsyncSession = Depends(get_db)):
@@ -28,7 +31,9 @@ async def verify_api_key(x_api_key: str = Header(...), db: AsyncSession = Depend
 
 
 @router.post("/ingest/audit", status_code=202)
+@limiter.limit(f"{settings.rate_limit_per_minute}/minute")
 async def ingest_audit_records(
+    request: Request,
     records: list[AuditRecordCreate],
     db: AsyncSession = Depends(get_db),
     customer: Customer = Depends(verify_api_key),
@@ -88,7 +93,9 @@ async def ingest_audit_records(
 
 
 @router.post("/ingest/events", status_code=202)
+@limiter.limit(f"{settings.rate_limit_per_minute}/minute")
 async def ingest_observability_events(
+    request: Request,
     events: list[dict],
     db: AsyncSession = Depends(get_db),
     customer: Customer = Depends(verify_api_key),
