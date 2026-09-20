@@ -3,6 +3,7 @@ Policies API - CRUD operations for policies.
 """
 
 import hashlib
+import uuid
 
 import yaml
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -11,15 +12,23 @@ from sqlalchemy import and_, desc, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ...database import get_db
-from ...models import Policy
+from ...models import Policy, User
+from ...services.auth import get_current_active_user, require_role
 
 router = APIRouter()
+
+
+def _parse_policy_id(policy_id: str) -> uuid.UUID:
+    """Parse a path-param policy_id into a UUID, or 404 on a malformed one."""
+    try:
+        return uuid.UUID(policy_id)
+    except ValueError:
+        raise HTTPException(status_code=404, detail="Policy not found")
 
 
 class PolicyCreate(BaseModel):
     """Schema for creating a new policy."""
 
-    customer_id: str
     agent_id: str
     policy_yaml: str
     description: str | None = None
@@ -73,13 +82,13 @@ def validate_policy_yaml(policy_yaml: str) -> dict:
 
 @router.get("/agents", response_model=list[str])
 async def list_agents(
-    customer_id: str = Query(...),
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
 ):
-    """List all unique agent IDs that have policies for a customer."""
+    """List all unique agent IDs that have policies for the caller's own tenant."""
     result = await db.execute(
         select(Policy.agent_id)
-        .where(Policy.customer_id == customer_id)
+        .where(Policy.customer_id == current_user.customer_id)
         .distinct()
         .order_by(Policy.agent_id)
     )
@@ -88,13 +97,13 @@ async def list_agents(
 
 @router.get("/policies", response_model=list[PolicyResponse])
 async def list_policies(
-    customer_id: str = Query(...),
     agent_id: str | None = Query(None),
     include_inactive: bool = Query(False),
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
 ):
-    """List policies for a customer."""
-    query = select(Policy).where(Policy.customer_id == customer_id)
+    """List policies for the caller's own tenant."""
+    query = select(Policy).where(Policy.customer_id == current_user.customer_id)
 
     if agent_id:
         query = query.where(Policy.agent_id == agent_id)
@@ -111,31 +120,40 @@ async def list_policies(
 
 
 @router.get("/policies/{policy_id}", response_model=PolicyResponse)
-async def get_policy(policy_id: str, db: AsyncSession = Depends(get_db)):
-    """Get a specific policy by ID."""
-    result = await db.execute(select(Policy).where(Policy.policy_id == policy_id))
+async def get_policy(
+    policy_id: str,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+):
+    """Get a specific policy by ID (scoped to the caller's own tenant)."""
+    result = await db.execute(select(Policy).where(Policy.policy_id == _parse_policy_id(policy_id)))
     policy = result.scalar_one_or_none()
 
-    if not policy:
+    if not policy or policy.customer_id != current_user.customer_id:
         raise HTTPException(status_code=404, detail="Policy not found")
 
     return PolicyResponse(**policy.to_dict())
 
 
 @router.post("/policies", response_model=PolicyResponse, status_code=201)
-async def create_policy(policy_data: PolicyCreate, db: AsyncSession = Depends(get_db)):
+async def create_policy(
+    policy_data: PolicyCreate,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_role("admin")),
+):
     """
-    Create a new policy version.
+    Create a new policy version for the caller's own tenant.
 
     Validates YAML, deactivates previous versions, and creates new active policy.
     """
     validate_policy_yaml(policy_data.policy_yaml)
 
+    customer_id = current_user.customer_id
     policy_hash = hashlib.sha256(policy_data.policy_yaml.encode()).hexdigest()
 
     existing_query = select(Policy).where(
         and_(
-            Policy.customer_id == policy_data.customer_id,
+            Policy.customer_id == customer_id,
             Policy.agent_id == policy_data.agent_id,
             Policy.policy_hash == policy_hash,
             Policy.is_active.is_(True),
@@ -147,7 +165,7 @@ async def create_policy(policy_data: PolicyCreate, db: AsyncSession = Depends(ge
 
     version_query = select(func.max(Policy.version)).where(
         and_(
-            Policy.customer_id == policy_data.customer_id,
+            Policy.customer_id == customer_id,
             Policy.agent_id == policy_data.agent_id,
         )
     )
@@ -156,7 +174,7 @@ async def create_policy(policy_data: PolicyCreate, db: AsyncSession = Depends(ge
 
     deactivate_query = select(Policy).where(
         and_(
-            Policy.customer_id == policy_data.customer_id,
+            Policy.customer_id == customer_id,
             Policy.agent_id == policy_data.agent_id,
             Policy.is_active.is_(True),
         )
@@ -166,7 +184,7 @@ async def create_policy(policy_data: PolicyCreate, db: AsyncSession = Depends(ge
         old_policy.is_active = False
 
     new_policy = Policy(
-        customer_id=policy_data.customer_id,
+        customer_id=customer_id,
         agent_id=policy_data.agent_id,
         policy_yaml=policy_data.policy_yaml,
         policy_hash=policy_hash,
@@ -188,17 +206,20 @@ async def assign_policy(
     policy_id: str,
     assign_data: PolicyAssignRequest,
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_role("admin")),
 ):
     """
-    Assign (copy) a policy to a different agent.
+    Assign (copy) a policy to a different agent within the caller's own tenant.
 
     Creates a new active policy version for the target agent using the source
     policy's YAML. Deactivates any existing active policy for the target agent.
     """
-    source_result = await db.execute(select(Policy).where(Policy.policy_id == policy_id))
+    source_result = await db.execute(
+        select(Policy).where(Policy.policy_id == _parse_policy_id(policy_id))
+    )
     source_policy = source_result.scalar_one_or_none()
 
-    if not source_policy:
+    if not source_policy or source_policy.customer_id != current_user.customer_id:
         raise HTTPException(status_code=404, detail="Policy not found")
 
     if assign_data.target_agent_id == source_policy.agent_id:
@@ -259,12 +280,16 @@ async def assign_policy(
 
 
 @router.post("/policies/{policy_id}/activate", response_model=PolicyResponse)
-async def activate_policy(policy_id: str, db: AsyncSession = Depends(get_db)):
-    """Activate a specific policy version (rollback)."""
-    result = await db.execute(select(Policy).where(Policy.policy_id == policy_id))
+async def activate_policy(
+    policy_id: str,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_role("admin")),
+):
+    """Activate a specific policy version (rollback), scoped to the caller's own tenant."""
+    result = await db.execute(select(Policy).where(Policy.policy_id == _parse_policy_id(policy_id)))
     policy = result.scalar_one_or_none()
 
-    if not policy:
+    if not policy or policy.customer_id != current_user.customer_id:
         raise HTTPException(status_code=404, detail="Policy not found")
 
     deactivate_query = select(Policy).where(

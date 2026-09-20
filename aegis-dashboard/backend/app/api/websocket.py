@@ -4,7 +4,11 @@ WebSocket endpoint for real-time audit record streaming.
 
 import asyncio
 
-from fastapi import APIRouter, Query, WebSocket, WebSocketDisconnect
+from fastapi import APIRouter, Depends, Query, WebSocket, WebSocketDisconnect
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from ..database import get_db
+from ..services.auth import get_user_from_token
 
 router = APIRouter()
 
@@ -70,12 +74,19 @@ manager = ConnectionManager()
 async def websocket_endpoint(
     websocket: WebSocket,
     customer_id: str = Query(...),
+    token: str | None = Query(None),
+    db: AsyncSession = Depends(get_db),
 ):
     """
     WebSocket endpoint for real-time audit record streaming.
 
     Query params:
         customer_id: Customer identifier for filtering
+        token: JWT access token (same one used for the HTTP API)
+
+    Closes with 4001 if the token is missing/invalid, 4003 if the token's
+    user doesn't belong to the requested customer_id. These codes are
+    special-cased by the frontend's reconnect-with-refresh logic.
 
     Messages sent to client:
         {
@@ -83,6 +94,19 @@ async def websocket_endpoint(
             "data": {...}
         }
     """
+    # A custom close code only reaches the browser if the handshake was
+    # accepted first - rejecting before accept() surfaces as a generic
+    # abnormal closure (1006), which the frontend can't distinguish.
+    user = await get_user_from_token(token, db) if token else None
+    if user is None:
+        await websocket.accept()
+        await websocket.close(code=4001)
+        return
+    if user.customer_id != customer_id:
+        await websocket.accept()
+        await websocket.close(code=4003)
+        return
+
     await manager.connect(websocket, customer_id)
 
     try:

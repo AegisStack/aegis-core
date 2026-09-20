@@ -9,7 +9,8 @@ from sqlalchemy import and_, case, desc, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ...database import get_db
-from ...models import AuditRecord
+from ...models import AuditRecord, User
+from ...services.auth import get_current_active_user
 
 router = APIRouter()
 
@@ -42,16 +43,16 @@ def _floor_timestamp(col, interval: str):
 
 @router.get("/metrics/timeseries")
 async def get_metrics_timeseries(
-    customer_id: str = Query(...),
     start: str | None = Query(None, description="ISO datetime start"),
     end: str | None = Query(None, description="ISO datetime end"),
     interval: str = Query("1m", description="Bucket interval: 1m, 5m, 15m, 1h"),
     agent_id: str | None = Query(None),
     tool_name: str | None = Query(None),
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
 ):
     """
-    Return time-bucketed metrics for charting.
+    Return time-bucketed metrics for charting, scoped to the caller's own tenant.
 
     Each bucket contains counts by outcome and latency percentiles.
     """
@@ -65,7 +66,7 @@ async def get_metrics_timeseries(
     bucket = _floor_timestamp(AuditRecord.timestamp, interval).label("bucket")
 
     filters = [
-        AuditRecord.customer_id == customer_id,
+        AuditRecord.customer_id == current_user.customer_id,
         AuditRecord.timestamp >= start_time,
         AuditRecord.timestamp <= end_time,
     ]
@@ -120,15 +121,16 @@ async def get_metrics_timeseries(
 
 @router.get("/metrics/explore")
 async def get_metrics_explore(
-    customer_id: str = Query(...),
     start: str = Query(..., description="ISO datetime start"),
     end: str = Query(..., description="ISO datetime end"),
     outcome: str | None = Query(None, description="Filter by outcome: allow, deny, escalate"),
     agent_id: str | None = Query(None),
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
 ):
     """
-    Return detailed breakdown for a specific time window.
+    Return detailed breakdown for a specific time window, scoped to the
+    caller's own tenant.
 
     Used by the /explore drill-down page. Returns:
     - Window summary (counts + latency)
@@ -139,7 +141,7 @@ async def get_metrics_explore(
     end_time = datetime.fromisoformat(end.replace("Z", "+00:00")).replace(tzinfo=None)
 
     base_filters = [
-        AuditRecord.customer_id == customer_id,
+        AuditRecord.customer_id == current_user.customer_id,
         AuditRecord.timestamp >= start_time,
         AuditRecord.timestamp <= end_time,
     ]
@@ -242,15 +244,17 @@ async def get_metrics_explore(
 
 @router.get("/metrics/summary")
 async def get_metrics_summary(
-    customer_id: str = Query(...),
     period: str = Query("7d", description="Time period: 1d, 7d, 30d"),
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
 ):
     """
-    Get summary metrics for dashboard overview.
+    Get summary metrics for dashboard overview, scoped to the caller's own tenant.
 
     Returns counts by outcome, top tools, top denied rules, and latency percentiles.
     """
+    customer_id = current_user.customer_id
+
     # Parse period
     period_map = {"1d": 1, "7d": 7, "30d": 30}
     days = period_map.get(period, 7)
