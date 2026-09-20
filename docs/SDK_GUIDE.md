@@ -21,22 +21,22 @@ pip install -e .
 
 `policy.yaml`:
 ```yaml
-version: 1.0
-default_action: deny
+version: 1
 rules:
   - tool: "send_email"
-    action: escalate
+    escalate: always
   - tool: "read_file"
-    action: allow
+    allow: always
+
+defaults:
+  unmatched_tool: deny
+  unmatched_param: deny
 ```
 
 ### 2. Wrap Your Tools
 
 ```python
-from aegis import PolicyEngine, wrap_tool
-
-# Load policy
-engine = PolicyEngine.from_yaml("policy.yaml")
+import aegis
 
 # Define tool
 def send_email(to: str, subject: str, body: str):
@@ -44,7 +44,11 @@ def send_email(to: str, subject: str, body: str):
     return f"Email sent to {to}"
 
 # Wrap it
-safe_send_email = wrap_tool(send_email, engine)
+(safe_send_email,) = aegis.wrap(
+    tools=[send_email],
+    policy="policy.yaml",
+    agent_id="my-agent",
+)
 
 # Use it - will escalate for human approval
 safe_send_email(to="user@example.com", subject="Hi", body="Hello")
@@ -79,96 +83,102 @@ Match tool parameters:
 ### Policy Structure
 
 ```yaml
-version: 1.0
-default_action: deny  # What to do if no rules match
+version: 1                   # Policy version (any int/string; hashed for policy_version)
 
 rules:
   - tool: "tool_name"        # Tool function name
-    action: allow            # allow | deny | escalate
-    conditions:              # Optional: match parameters
-      - field: "param_name"
-        operator: "eq"
-        value: "expected_value"
+    allow: always            # OR a list of condition dicts, e.g.:
+    #  - param_name: { eq: "expected_value" }
+    escalate: [...]          # same shape as allow
+    deny: [...]              # same shape as allow
+
+defaults:
+  unmatched_tool: deny       # applied when no rule matches the tool name
+  unmatched_param: deny      # applied when a rule matches but no allow condition does
 ```
+
+Each of `allow`/`deny`/`escalate` on a rule is either the literal string
+`always`, or a list of condition dicts. A condition dict maps parameter names
+to a value (or an operator dict, e.g. `{ gt: 100 }`); all keys in one dict
+must match (AND), and any dict in the list matching is enough (OR). See
+[Evaluation order](../README.md#evaluation-order) for how `deny`/`escalate`/`allow`
+are checked in sequence.
+
+**There is no default-allow.** `unmatched_tool` only recognizes the literal
+value `"deny"` - any other value (including `"allow"`) is treated as
+`"escalate"`, never as an implicit allow. Likewise `unmatched_param` only
+recognizes `"escalate"` specially; anything else denies. This is intentional
+fail-safe behavior: a typo'd or forgotten default can only make Aegis more
+restrictive, never silently permissive.
 
 ## Common Patterns
 
 ### Pattern 1: Allow Safe Operations
 
 ```yaml
-version: 1.0
-default_action: deny
+version: 1
 rules:
-  # Read-only operations allowed
   - tool: "read_file"
-    action: allow
+    allow: always
   - tool: "list_directory"
-    action: allow
-  
-  # Everything else denied by default
+    allow: always
+
+defaults:
+  unmatched_tool: deny  # Everything else denied by default
 ```
 
 ### Pattern 2: Conditional Approval
 
 ```yaml
-version: 1.0
-default_action: deny
+version: 1
 rules:
-  # Allow file reads only from safe directories
   - tool: "read_file"
-    action: allow
-    conditions:
-      - field: "path"
-        operator: "regex"
-        value: "^/home/user/documents/.*"
-  
-  # Deny reads from other locations (explicit)
-  - tool: "read_file"
-    action: deny
+    allow:
+      - path: { regex: "^/home/user/documents/.*" }
+    # Note: deny is checked before allow, so a catch-all deny regex here
+    # would always win - reads outside the allowed path are denied by
+    # defaults.unmatched_param below instead.
+
+defaults:
+  unmatched_tool: deny
+  unmatched_param: deny
 ```
 
 ### Pattern 3: Escalate Risky Actions
 
 ```yaml
-version: 1.0
-default_action: allow
+version: 1
 rules:
-  # Database writes need approval
   - tool: "execute_sql"
-    action: escalate
-    conditions:
-      - field: "query"
-        operator: "regex"
-        value: ".*(UPDATE|DELETE|DROP).*"
-  
-  # File deletion needs approval
+    escalate:
+      - query: { regex: ".*(UPDATE|DELETE|DROP).*" }
+    allow: always  # non-matching (e.g. read-only) queries proceed
+
   - tool: "delete_file"
-    action: escalate
-  
-  # Everything else allowed
+    escalate: always
+
+  - tool: "read_file"
+    allow: always
+
+defaults:
+  # Tools not explicitly listed above are denied, not allowed - see the
+  # "no default-allow" note above. List every tool the agent may call.
+  unmatched_tool: deny
 ```
 
 ### Pattern 4: Environment-Based Rules
 
 ```yaml
-version: 1.0
-default_action: deny
+version: 1
 rules:
-  # Allow deploys to staging
   - tool: "deploy_application"
-    action: allow
-    conditions:
-      - field: "environment"
-        operator: "eq"
-        value: "staging"
-  
-  # Escalate production deploys
-  - tool: "deploy_application"
-    action: escalate
-    conditions:
-      - field: "environment"
-        operator: "eq"
-        value: "production"
+    allow:
+      - environment: { eq: "staging" }
+    escalate:
+      - environment: { eq: "production" }
+
+defaults:
+  unmatched_tool: deny
 ```
 
 ## API Reference
@@ -177,75 +187,82 @@ rules:
 
 ```python
 from aegis import PolicyEngine
+import yaml
 
-# Load from YAML file
-engine = PolicyEngine.from_yaml("policy.yaml")
+# PolicyEngine takes an already-parsed policy dict, not a file path
+with open("policy.yaml") as f:
+    policy_dict = yaml.safe_load(f)
 
-# Load from dict
-engine = PolicyEngine.from_dict({
-    "version": 1.0,
-    "default_action": "deny",
-    "rules": []
-})
+engine = PolicyEngine(policy_dict)
 
 # Evaluate a decision
 decision = engine.evaluate("tool_name", {"param": "value"})
-print(decision.action)  # "allow", "deny", or "escalate"
+print(decision.outcome)  # Outcome.ALLOW, Outcome.DENY, or Outcome.ESCALATE
 ```
 
-### wrap_tool
+In practice you rarely construct `PolicyEngine` directly — `aegis.wrap()` and
+`aegis.wrap_function_map()` accept a policy file path or dict and build the
+engine internally.
+
+### wrap / wrap_function_map
 
 ```python
-from aegis import wrap_tool
+import aegis
 
-# Single function
-wrapped = wrap_tool(my_function, engine, on_deny="raise")
-
-# Multiple functions
-wrapped_tools = wrap_tool(
-    {"tool1": func1, "tool2": func2},
-    engine,
-    on_deny="raise"
+# List of functions -> list of wrapped functions, same order
+wrapped_tools = aegis.wrap(
+    tools=[func1, func2],
+    policy="policy.yaml",   # file path or a policy dict
+    agent_id="my-agent",
+    on_deny="raise",
 )
 
-# Options:
-# on_deny="raise"         - Raise PermissionError (default)
-# on_deny="return_error"  - Return {"error": "...", "denied": True}
+# Dict of {name: function} -> dict of {name: wrapped function}
+wrapped_map = aegis.wrap_function_map(
+    {"tool1": func1, "tool2": func2},
+    policy="policy.yaml",
+    agent_id="my-agent",
+    on_deny="raise",
+)
+
+# on_deny="raise"         - Raise AegisViolationError (default)
+# on_deny="return_error"  - Return "AEGIS_DENIED: <reason>"
 # on_deny="silent"        - Return None silently
 ```
 
 ### EscalationManager
 
 ```python
-from aegis import EscalationManager
+import aegis
 
-mgr = EscalationManager()
-
-# Wrap tools with escalation support
-wrapped = wrap_tool(func, engine, escalation_manager=mgr)
-
-# List pending escalations
-pending = mgr.list_pending()
-
-# Resolve escalation
-mgr.resolve(
-    escalation_id="esc_123",
-    resolution="approved",  # or "rejected"
-    reason="Reviewed and approved"
+wrapped = aegis.wrap(
+    tools=[func],
+    policy="policy.yaml",
+    agent_id="my-agent",
+    escalation_webhook="https://hooks.acme.com/escalations",
+    escalation_timeout_minutes=30,
+    on_escalate="block",  # or "notify_and_proceed"
 )
 ```
 
-### AuditWriter
+`aegis.wrap()` creates and owns the `EscalationManager` internally — pass
+`escalation_webhook`/`escalation_timeout_minutes`/`on_escalate` to `wrap()`
+rather than constructing `EscalationManager` yourself, unless you're
+building a custom integration (see `aegis/core/escalation.py`).
+
+### AuditWriter / Sinks
 
 ```python
-from aegis.audit import AuditWriter, FileSink
+import aegis
 
-# Create writer with file sink
-writer = AuditWriter()
-writer.add_sink(FileSink("audit.jsonl"))
-
-# Use with wrapped tools
-wrapped = wrap_tool(func, engine, audit_writer=writer)
+wrapped = aegis.wrap(
+    tools=[func],
+    policy="policy.yaml",
+    agent_id="my-agent",
+    audit_sink=aegis.FileSink(path="audit.jsonl"),
+    # or a list to fan out to multiple sinks:
+    # audit_sink=[aegis.FileSink(path="audit.jsonl"), aegis.WebhookSink(url="...")],
+)
 
 # Every tool call is logged to audit.jsonl
 ```
@@ -253,18 +270,22 @@ wrapped = wrap_tool(func, engine, audit_writer=writer)
 ## Testing Your Policies
 
 ```python
-import pytest
-from aegis import PolicyEngine
+from aegis import PolicyEngine, Outcome
+
+def load_engine(path):
+    import yaml
+    with open(path) as f:
+        return PolicyEngine(yaml.safe_load(f))
 
 def test_policy_allows_safe_reads():
-    engine = PolicyEngine.from_yaml("policy.yaml")
+    engine = load_engine("policy.yaml")
     decision = engine.evaluate("read_file", {"path": "/safe/file.txt"})
-    assert decision.action == "allow"
+    assert decision.outcome == Outcome.ALLOW
 
 def test_policy_denies_dangerous_deletes():
-    engine = PolicyEngine.from_yaml("policy.yaml")
+    engine = load_engine("policy.yaml")
     decision = engine.evaluate("delete_file", {"path": "/important.txt"})
-    assert decision.action == "deny"
+    assert decision.outcome == Outcome.DENY
 ```
 
 Run tests:
@@ -277,47 +298,33 @@ pytest test_policies.py -v
 ### With LangChain
 
 ```python
-from langchain.agents import Tool
-from aegis import PolicyEngine, wrap_tool
-
-engine = PolicyEngine.from_yaml("policy.yaml")
+from langchain.tools import Tool
+import aegis
 
 def search_database(query: str):
     # Your DB logic
     pass
 
-# Wrap as LangChain tool
-safe_search = wrap_tool(search_database, engine)
-tool = Tool(
-    name="DatabaseSearch",
-    func=safe_search,
-    description="Search the database"
+raw_tools = [Tool(name="search_database", func=search_database, description="...")]
+
+wrapped_tools = aegis.wrap_langchain_tools(
+    tools=raw_tools,
+    policy="policy.yaml",
+    agent_id="my-agent",
 )
 ```
 
 ### With OpenAI Function Calling
 
 ```python
-import openai
-from aegis import PolicyEngine, wrap_tool
-
-engine = PolicyEngine.from_yaml("policy.yaml")
+import aegis
 
 functions = {
     "send_email": send_email_func,
-    "read_file": read_file_func
+    "read_file": read_file_func,
 }
 
-# Wrap all functions
-safe_functions = wrap_tool(functions, engine)
-
-# Use with OpenAI
-response = openai.ChatCompletion.create(
-    model="gpt-4",
-    messages=[...],
-    functions=[...],
-    function_call="auto"
-)
+safe_functions = aegis.wrap_function_map(functions, policy="policy.yaml", agent_id="my-agent")
 
 # Execute with policy enforcement
 func_name = response.choices[0].message.function_call.name
@@ -328,23 +335,15 @@ result = safe_functions[func_name](**func_args)
 ### With Anthropic Claude
 
 ```python
-import anthropic
-from aegis import PolicyEngine, wrap_tool
+import aegis
 
-engine = PolicyEngine.from_yaml("policy.yaml")
-client = anthropic.Anthropic()
-
-tools = wrap_tool({
-    "execute_code": execute_code_func,
-    "access_files": access_files_func
-}, engine)
-
-# Use with tool calls
-response = client.messages.create(
-    model="claude-3-5-sonnet-20241022",
-    max_tokens=1024,
-    tools=[...],
-    messages=[...]
+tools = aegis.wrap_function_map(
+    {
+        "execute_code": execute_code_func,
+        "access_files": access_files_func,
+    },
+    policy="policy.yaml",
+    agent_id="my-agent",
 )
 
 for block in response.content:
@@ -352,58 +351,36 @@ for block in response.content:
         result = tools[block.name](**block.input)
 ```
 
+### MCP server
+
+```python
+from mcp.server import Server
+import aegis
+
+server = Server("my-agent")
+
+@server.call_tool()
+@aegis.mcp_enforce(policy="policy.yaml", agent_id="my-agent")
+async def handle_tool_call(name: str, arguments: dict):
+    if name == "issue_refund":
+        return await issue_refund(**arguments)
+```
+
 ## Performance Tips
 
-1. **Load policies once** - Reuse PolicyEngine instances
-2. **Batch wrap tools** - Use dict wrapping for multiple functions
-3. **Use on_deny="silent"** - For less critical operations
-4. **Async support** - Coming in v0.2.0
-
-## CLI Usage
-
-Validate policies:
-```bash
-aegis validate policy.yaml
-```
-
-Test policy decisions:
-```bash
-aegis test policy.yaml --tool read_file --params '{"path": "/tmp/file.txt"}'
-```
-
-Generate policy template:
-```bash
-aegis init > policy.yaml
-```
-
-## Configuration Files
-
-Create `.aegisrc` in your project:
-
-```yaml
-policy_path: "./policies/production.yaml"
-audit_path: "./audit/logs"
-default_on_deny: "raise"
-escalation_timeout: 300  # 5 minutes
-```
-
-Load in code:
-```python
-from aegis import load_config
-
-config = load_config(".aegisrc")
-engine = PolicyEngine.from_yaml(config["policy_path"])
-```
+1. **Load policies once** - Call `aegis.wrap()` once per agent lifecycle, not per tool call.
+2. **Batch wrap tools** - Use `wrap_function_map()` for multiple functions.
+3. **Use on_deny="silent"** - For less critical operations.
 
 ## Best Practices
 
-1. **Start restrictive** - Use `default_action: deny`, then allow specific tools
-2. **Test policies** - Write unit tests for critical rules
-3. **Version policies** - Track changes in git
-4. **Audit everything** - Enable audit logging in production
-5. **Review escalations** - Regularly check what's being escalated
-6. **Use regex carefully** - Test patterns thoroughly
-7. **Document intent** - Add comments to YAML explaining why rules exist
+1. **Start restrictive** - Set `defaults.unmatched_tool: deny`, then allow specific tools.
+2. **Test policies** - Write unit tests for critical rules (see [Testing Your Policies](#testing-your-policies)).
+3. **Version policies** - Track changes in git.
+4. **Audit everything** - Enable audit logging in production.
+5. **Review escalations** - Regularly check what's being escalated.
+6. **Use regex carefully** - Test patterns thoroughly.
+7. **Document intent** - Add comments to YAML explaining why rules exist.
 
 ## Troubleshooting
 
@@ -416,21 +393,16 @@ with open("policy.yaml") as f:
 
 **Tool not matching:**
 ```python
-# Enable debug logging
-import logging
-logging.basicConfig(level=logging.DEBUG)
-
 decision = engine.evaluate("tool_name", params)
-# Shows which rules were evaluated
+print(decision.matched_rule, decision.reason)  # Shows which rule/default applied
 ```
 
 **Function signature lost:**
 ```python
 # Aegis preserves signatures automatically
-wrapped = wrap_tool(func, engine)
+(wrapped,) = aegis.wrap(tools=[func], policy="policy.yaml", agent_id="my-agent")
 print(wrapped.__name__)      # Original name
 print(wrapped.__doc__)       # Original docstring
-print(wrapped.__signature__) # Original signature
 ```
 
 ## Support

@@ -14,7 +14,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - TBD
 
 ### Fixed
-- TBD
+- Corrected the `[0.1.0]` entry's frontend test count (was overstated as 24; actual count was 15).
+- Fixed onboarding docs (`README.md`, `docs/QUICKSTART.md`, `docs/SDK_GUIDE.md`, `docs/RUNNING_LOCALLY.md`, `docs/RELEASING.md`) referencing a `wrap_tool` function that never existed in the public API; examples now use the real `aegis.wrap()`/`aegis.wrap_function_map()`.
 
 ## [0.1.0] - 2026-04-06
 
@@ -41,7 +42,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **Testing:**
   - 44 SDK unit tests with pytest
-  - 24 frontend component tests with Jest
+  - 15 frontend component tests with Jest
   - 13 backend API tests with async fixtures
   - Complete test coverage for all core modules
 

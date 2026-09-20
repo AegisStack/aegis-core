@@ -9,85 +9,57 @@
 
 ## Running the Dashboard Locally
 
+This is the short version — see [RUNNING_LOCALLY.md](RUNNING_LOCALLY.md) for full
+detail, troubleshooting, and running the backend without Docker.
+
 ### Prerequisites
 - Docker & Docker Compose
 - Node.js 18+ and npm
-- Python 3.10+
+- Python 3.9+ (3.10+ recommended)
 
 ### Step 1: Start Backend Services
 
 ```bash
 cd aegis-dashboard
-docker-compose up -d
+docker-compose up -d --build
 ```
 
-This starts:
-- PostgreSQL 15 with TimescaleDB (port 5432)
-- Backend API (port 8000)
-- Frontend (port 3000)
+This starts PostgreSQL 15 + TimescaleDB and Redis, and the backend API (port 8000).
 
 ### Step 2: Initialize the Database
+
+Seeds tables plus a demo customer and users:
 
 ```bash
 cd backend
 pip install -r requirements.txt
-alembic upgrade head
+python init_db.py
 ```
 
-### Step 3: Create Test Users
+This prints the seeded accounts and API keys, including:
+- Admin: `admin@test.com` / `admin123`
+- Operator: `operator@test.com` / `operator123`
+- Viewer: `viewer@test.com` / `viewer123`
+
+### Step 3: Start the Frontend
 
 ```bash
-python -c "
-from app.core.auth import get_password_hash
-import asyncio
-from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
-from sqlalchemy.orm import sessionmaker
-from app.models.database import User, Customer
-
-async def create_users():
-    engine = create_async_engine('postgresql+asyncpg://aegis:aegis_password@localhost/aegis_db')
-    async_session = sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
-    
-    async with async_session() as session:
-        # Create customer
-        customer = Customer(
-            customer_id='customer_1',
-            name='Test Company',
-            api_key='test_api_key_123'
-        )
-        session.add(customer)
-        await session.flush()
-        
-        # Create admin user
-        admin = User(
-            email='admin@test.com',
-            full_name='Admin User',
-            hashed_password=get_password_hash('admin123'),
-            customer_id='customer_1',
-            role='admin',
-            is_active=True,
-            is_verified=True
-        )
-        session.add(admin)
-        await session.commit()
-        print('Created admin@test.com / admin123')
-
-asyncio.run(create_users())
-"
+cd aegis-dashboard/frontend
+cp .env.local.example .env.local
+npm install
+npm run dev
 ```
 
 ### Step 4: Access the Dashboard
 
-Open http://localhost:3000 and log in:
-- Email: `admin@test.com`
-- Password: `admin123`
+Open http://localhost:3003 and log in with one of the demo accounts above.
 
 ### Available Endpoints
 
-- **Frontend:** http://localhost:3000
+- **Frontend:** http://localhost:3003
 - **Backend API:** http://localhost:8000
 - **API Docs:** http://localhost:8000/docs
-- **WebSocket:** ws://localhost:8000/ws
+- **WebSocket:** ws://localhost:8000/ws/live
 
 ---
 
@@ -112,36 +84,27 @@ pip install git+https://github.com/yourorg/aegis-core.git
 Create `my_policy.yaml`:
 
 ```yaml
-version: 1.0
-default_action: deny
+version: 1
 rules:
   - tool: "execute_code"
-    action: escalate
-    conditions:
-      - field: "language"
-        operator: "in"
-        value: ["python", "javascript"]
-  
+    escalate:
+      - language: { in: ["python", "javascript"] }
+
   - tool: "read_file"
-    action: allow
-    conditions:
-      - field: "path"
-        operator: "regex"
-        value: "^/home/user/documents/.*"
-  
+    allow:
+      - path: { regex: "^/home/user/documents/.*" }
+
   - tool: "delete_file"
-    action: deny
+    deny: always
+
+defaults:
+  unmatched_tool: deny
+  unmatched_param: deny
 ```
 
-#### 2. Initialize Aegis
+#### 2. Define Your Tools
 
 ```python
-from aegis import PolicyEngine, wrap_tool
-
-# Load policy
-engine = PolicyEngine.from_yaml("my_policy.yaml")
-
-# Define your tool functions
 def execute_code(language: str, code: str):
     """Execute code in the specified language."""
     # Your implementation
@@ -162,31 +125,37 @@ def delete_file(path: str):
 #### 3. Wrap Your Tools
 
 ```python
-# Wrap individual functions
-safe_execute = wrap_tool(execute_code, engine, on_deny="raise")
-safe_read = wrap_tool(read_file, engine, on_deny="raise")
-safe_delete = wrap_tool(delete_file, engine, on_deny="raise")
+import aegis
+
+safe_execute, safe_read, safe_delete = aegis.wrap(
+    tools=[execute_code, read_file, delete_file],
+    policy="my_policy.yaml",
+    agent_id="my-agent",
+    on_deny="raise",
+)
 
 # Use wrapped functions
 try:
     result = safe_execute(language="python", code="print('hello')")
     # This escalates - waits for human approval
-except PermissionError as e:
+except aegis.AegisViolationError as e:
     print(f"Denied: {e}")
 ```
 
-#### 4. Batch Wrapping
+#### 4. Batch Wrapping by Name
+
+If you'd rather look tools up by name (e.g. dispatching OpenAI/Anthropic tool
+calls), use `wrap_function_map()` instead:
 
 ```python
 tools = {
     "execute_code": execute_code,
     "read_file": read_file,
-    "delete_file": delete_file
+    "delete_file": delete_file,
 }
 
-wrapped = wrap_tool(tools, engine, on_deny="raise")
+wrapped = aegis.wrap_function_map(tools, policy="my_policy.yaml", agent_id="my-agent")
 
-# Use wrapped tools
 wrapped["read_file"](path="/home/user/documents/report.txt")  # Allowed
 wrapped["delete_file"](path="/tmp/file.txt")  # Denied
 ```
@@ -196,92 +165,72 @@ wrapped["delete_file"](path="/tmp/file.txt")  # Denied
 #### On Deny Behavior
 
 ```python
-# Raise exception (default)
-wrap_tool(func, engine, on_deny="raise")
+# Raise AegisViolationError (default)
+aegis.wrap(tools=[func], policy=policy, agent_id="agent", on_deny="raise")
 
-# Return error dict
-wrap_tool(func, engine, on_deny="return_error")
+# Return "AEGIS_DENIED: <reason>" instead of raising
+aegis.wrap(tools=[func], policy=policy, agent_id="agent", on_deny="return_error")
 
 # Silent failure (returns None)
-wrap_tool(func, engine, on_deny="silent")
+aegis.wrap(tools=[func], policy=policy, agent_id="agent", on_deny="silent")
 ```
 
 #### Audit Configuration
 
 ```python
-from aegis.audit import FileSink, AuditWriter
+from aegis import FileSink
 
-# Configure audit writer
-audit_writer = AuditWriter()
-audit_writer.add_sink(FileSink("audit.jsonl"))
+audit_sink = FileSink(path="audit.jsonl")
 
-# Pass to wrapper
-wrap_tool(func, engine, audit_writer=audit_writer)
+wrapped = aegis.wrap(
+    tools=[func], policy=policy, agent_id="agent", audit_sink=audit_sink,
+)
 ```
 
 ### Advanced: Escalation Handling
 
 ```python
-from aegis import PolicyEngine, wrap_tool, EscalationManager
+import aegis
 
-engine = PolicyEngine.from_yaml("policy.yaml")
-escalation_mgr = EscalationManager()
-
-# Wrap with escalation support
-safe_tool = wrap_tool(
-    my_function,
-    engine,
-    escalation_manager=escalation_mgr,
-    on_deny="raise"
+wrapped = aegis.wrap(
+    tools=[my_function],
+    policy="policy.yaml",
+    agent_id="my-agent",
+    escalation_webhook="https://hooks.acme.com/escalations",
+    escalation_timeout_minutes=30,
+    on_escalate="block",  # or "notify_and_proceed"
 )
-
-# In another thread/process, resolve escalations
-pending = escalation_mgr.list_pending()
-for esc in pending:
-    print(f"Escalation {esc.escalation_id}: {esc.tool_name}({esc.arguments})")
-    # Human reviews and approves
-    escalation_mgr.resolve(esc.escalation_id, "approved", "Looks safe")
 ```
+
+Escalations are resolved via the dashboard's Escalations page (or its
+`/api/v1/escalations/{id}/resolve` endpoint), not directly against the SDK's
+in-process `EscalationManager`.
 
 ### Integration with Dashboard
 
-Send audit records to the dashboard:
+Send audit records to the dashboard using the built-in sink:
 
 ```python
-import requests
-from aegis.events import ObservabilityEvent
+import aegis
 
-def send_to_dashboard(event: ObservabilityEvent):
-    """Send audit event to Aegis Dashboard."""
-    requests.post(
-        "http://localhost:8000/api/v1/ingest/audit",
-        headers={"X-API-Key": "test_api_key_123"},
-        json=event.to_dict()
-    )
+dashboard_sink = aegis.AegisDashboardSink(
+    base_url="http://localhost:8000",
+    api_key="test_api_key_12345",
+)
 
-# Use with custom sink
-class DashboardSink:
-    def write(self, record):
-        send_to_dashboard(record.event)
-
-from aegis.audit import AuditWriter
-writer = AuditWriter()
-writer.add_sink(DashboardSink())
-
-wrap_tool(func, engine, audit_writer=writer)
+wrapped = aegis.wrap(
+    tools=[func],
+    policy="policy.yaml",
+    agent_id="my-agent",
+    customer_id="acme-corp",
+    audit_sink=dashboard_sink,
+)
 ```
 
 ### Example: Complete Integration
 
 ```python
-from aegis import PolicyEngine, wrap_tool
-from aegis.audit import AuditWriter, FileSink
-import requests
-
-# Setup
-engine = PolicyEngine.from_yaml("policy.yaml")
-audit_writer = AuditWriter()
-audit_writer.add_sink(FileSink("local_audit.jsonl"))
+import aegis
 
 # Your AI agent tools
 def execute_command(command: str):
@@ -295,21 +244,21 @@ def access_database(query: str):
 # Wrap all tools
 tools = {
     "execute_command": execute_command,
-    "access_database": access_database
+    "access_database": access_database,
 }
 
-safe_tools = wrap_tool(
+safe_tools = aegis.wrap_function_map(
     tools,
-    engine,
-    audit_writer=audit_writer,
-    on_deny="raise"
+    policy="policy.yaml",
+    agent_id="my-agent",
+    audit_sink=aegis.FileSink(path="local_audit.jsonl"),
 )
 
 # Use in your agent
 try:
     result = safe_tools["execute_command"](command="ls -la")
     print(result)
-except PermissionError:
+except aegis.AegisViolationError:
     print("Command blocked by policy")
 ```
 
@@ -361,12 +310,15 @@ with open("policy.yaml") as f:
 
 **Escalations not working:**
 ```python
-# Ensure escalation manager is shared across tool wrappers
-from aegis import EscalationManager
-
-mgr = EscalationManager()  # Create once
-wrap_tool(func1, engine, escalation_manager=mgr)
-wrap_tool(func2, engine, escalation_manager=mgr)  # Same instance
+# Wrap all tools that should share escalation/audit config in a single
+# aegis.wrap() call rather than one call per tool - each call creates its
+# own PolicyEngine/EscalationManager internally.
+wrapped = aegis.wrap(
+    tools=[func1, func2],
+    policy="policy.yaml",
+    agent_id="my-agent",
+    escalation_webhook="https://hooks.acme.com/escalations",
+)
 ```
 
 ### Running Tests

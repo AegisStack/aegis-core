@@ -206,7 +206,7 @@ source test_env/bin/activate  # Windows: test_env\Scripts\activate
 pip install aegis-sdk==0.2.0
 
 # Test
-python -c "from aegis import PolicyEngine, wrap_tool; print('Success')"
+python -c "from aegis import wrap; print('Success')"
 
 # Cleanup
 deactivate

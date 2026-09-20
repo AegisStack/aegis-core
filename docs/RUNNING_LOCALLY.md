@@ -27,7 +27,7 @@ the frontend `package.json`):
 | Frontend | http://localhost:3003 | `next dev -p 3003` |
 | Backend API | http://localhost:8000 | FastAPI |
 | API docs (Swagger) | http://localhost:8000/docs | |
-| WebSocket | ws://localhost:8000/ws | Live feed |
+| WebSocket | ws://localhost:8000/ws/live | Live feed |
 | PostgreSQL | localhost:5433 | Mapped to container port 5432 |
 | Redis | localhost:6379 | |
 
@@ -53,7 +53,7 @@ pip install -e ".[dev]"
 ### Verify
 
 ```bash
-python -c "from aegis import PolicyEngine, wrap_tool; print('Aegis SDK OK')"
+python -c "from aegis import wrap; print('Aegis SDK OK')"
 ```
 
 ### Run the tests

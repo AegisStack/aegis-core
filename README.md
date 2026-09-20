@@ -65,30 +65,27 @@ pip install -e .
 `policy.yaml`:
 
 ```yaml
-version: 1.0
-default_action: deny
-
+version: 1
 rules:
   - tool: "send_email"
-    action: escalate
+    escalate: always
 
   - tool: "read_file"
-    action: allow
-    conditions:
-      - field: "path"
-        operator: "regex"
-        value: "^/safe/.*"
+    allow:
+      - path: { regex: "^/safe/.*" }
 
   - tool: "delete_file"
-    action: deny
+    deny: always
+
+defaults:
+  unmatched_tool: deny
+  unmatched_param: deny  # non-matching read_file paths are denied by this default
 ```
 
 ### 2. Wrap your tools
 
 ```python
-from aegis import PolicyEngine, wrap_tool
-
-engine = PolicyEngine.from_yaml("policy.yaml")
+import aegis
 
 def send_email(to: str, subject: str, body: str):
     return f"Email sent to {to}"
@@ -102,20 +99,20 @@ def delete_file(path: str):
     os.remove(path)
     return f"Deleted {path}"
 
-wrapped = wrap_tool(
-    {
-        "send_email": send_email,
-        "read_file": read_file,
-        "delete_file": delete_file,
-    },
-    engine,
+wrapped_send, wrapped_read, wrapped_delete = aegis.wrap(
+    tools=[send_email, read_file, delete_file],
+    policy="policy.yaml",
+    agent_id="my-agent",
     on_deny="raise",
 )
 
-wrapped["read_file"](path="/safe/file.txt")                     # Allowed
-wrapped["send_email"](to="user@example.com", subject="Hi", body="Hello")  # Escalates
-wrapped["delete_file"](path="/important.txt")                   # Denied
+wrapped_read(path="/safe/file.txt")                     # Allowed
+wrapped_send(to="user@example.com", subject="Hi", body="Hello")  # Escalates
+wrapped_delete(path="/important.txt")                    # Denied
 ```
+
+Prefer a dict of `{name: function}` (e.g. for OpenAI-style function calling)? Use
+`aegis.wrap_function_map()` instead — see [Raw OpenAI function calling](#raw-openai-function-calling) below.
 
 ### 3. View in the dashboard
 
