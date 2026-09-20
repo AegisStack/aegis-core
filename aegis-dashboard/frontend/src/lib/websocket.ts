@@ -31,6 +31,7 @@ export class AegisWebSocket {
   private intentionalClose = false
 
   constructor(
+    private readonly customerId: string,
     private readonly onMessage: (message: WebSocketMessage) => void,
     private readonly onConnect?: () => void,
     private readonly onDisconnect?: () => void,
@@ -47,8 +48,9 @@ export class AegisWebSocket {
 
     try {
       const token = getAccessToken()
-      const tokenParam = token ? `?token=${encodeURIComponent(token)}` : ''
-      const url = `${this.baseUrl}/ws/live${tokenParam}`
+      const params = new URLSearchParams({ customer_id: this.customerId })
+      if (token) params.set('token', token)
+      const url = `${this.baseUrl}/ws/live?${params.toString()}`
       this.ws = new WebSocket(url)
 
       this.ws.onopen = () => {
@@ -125,7 +127,9 @@ export class AegisWebSocket {
       }
 
       const data = await response.json()
-      setTokens(data.access_token, refreshToken)
+      // The backend rotates refresh tokens on every use (the old one is
+      // revoked), so persist the new one rather than reusing the old value.
+      setTokens(data.access_token, data.refresh_token ?? refreshToken)
       this.connect()
     } catch {
       clearTokens()

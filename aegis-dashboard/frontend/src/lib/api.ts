@@ -3,7 +3,7 @@
  */
 
 import axios, { AxiosInstance } from 'axios'
-import { getAccessToken } from './auth'
+import { getAccessToken, clearTokens } from './auth'
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
 
@@ -23,6 +23,22 @@ apiClient.interceptors.request.use((config) => {
   }
   return config
 })
+
+// A 401 means the access token is missing/expired/invalid and can't be
+// silently refreshed on a plain HTTP request (unlike the WebSocket, which
+// has its own refresh-and-reconnect flow) - send the user to log in again.
+apiClient.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    if (error.response?.status === 401 && typeof window !== 'undefined') {
+      clearTokens()
+      if (window.location.pathname !== '/login') {
+        window.location.href = '/login'
+      }
+    }
+    return Promise.reject(error)
+  }
+)
 
 // Types
 export interface AuditRecord {
@@ -118,7 +134,7 @@ export const api = {
     password: string
     full_name: string
     customer_id: string
-  }): Promise<{ access_token: string; token_type: string; user: any }> {
+  }): Promise<{ access_token: string; refresh_token: string; token_type: string; user: any }> {
     const response = await apiClient.post('/api/v1/auth/register', data)
     return response.data
   },
@@ -126,13 +142,13 @@ export const api = {
   async login(data: {
     email: string
     password: string
-  }): Promise<{ access_token: string; token_type: string; user: any }> {
+  }): Promise<{ access_token: string; refresh_token: string; token_type: string; user: any }> {
     const response = await apiClient.post('/api/v1/auth/login', data)
     return response.data
   },
 
-  async logout(): Promise<void> {
-    await apiClient.post('/api/v1/auth/logout')
+  async logout(refreshToken?: string | null): Promise<void> {
+    await apiClient.post('/api/v1/auth/logout', refreshToken ? { refresh_token: refreshToken } : {})
   },
 
   async getCurrentUser(): Promise<any> {
@@ -288,7 +304,6 @@ export const api = {
     escalationId: string,
     data: {
       resolution: 'approved' | 'denied'
-      resolved_by: string
     }
   ): Promise<Escalation> {
     const response = await apiClient.post(

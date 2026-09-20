@@ -142,10 +142,7 @@ export default function EscalationsPage() {
 
   const resolveMutation = useMutation({
     mutationFn: ({ id, resolution }: { id: string; resolution: 'approved' | 'denied' }) =>
-      api.resolveEscalation(id, {
-        resolution,
-        resolved_by: `operator@${customerId}`,
-      }),
+      api.resolveEscalation(id, { resolution }),
     onSuccess: () => {
       // Invalidate and refetch
       queryClient.invalidateQueries({ queryKey: ['escalations'] })

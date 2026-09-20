@@ -21,6 +21,7 @@ export function LiveFeed({ customerId, maxItems = 10 }: LiveFeedProps) {
     if (typeof window === 'undefined') return
 
     const ws = new AegisWebSocket(
+      customerId,
       (message: WebSocketMessage) => {
         if (message.type === 'audit_record') {
           const data = message.data as Record<string, unknown>

@@ -2,10 +2,12 @@
 
 import Link from 'next/link'
 import Image from 'next/image'
-import { usePathname } from 'next/navigation'
+import { usePathname, useRouter } from 'next/navigation'
 import { useState, useEffect } from 'react'
 import { useCustomer } from '@/app/providers'
-import { LayoutDashboard, ScrollText, AlertTriangle, Shield, ChevronsLeft, ChevronsRight, Search } from 'lucide-react'
+import { api } from '@/lib/api'
+import { getRefreshToken, clearTokens } from '@/lib/auth'
+import { LayoutDashboard, ScrollText, AlertTriangle, Shield, ChevronsLeft, ChevronsRight, Search, LogOut } from 'lucide-react'
 
 const KNOWN_CUSTOMERS = ['acme-corp', 'beta-corp', 'test_customer']
 
@@ -21,6 +23,7 @@ const STORAGE_KEY = 'aegis_sidebar_collapsed'
 
 export function NavBar() {
   const pathname = usePathname()
+  const router = useRouter()
   const { customerId, setCustomerId } = useCustomer()
   const [custom, setCustom] = useState('')
   const [showInput, setShowInput] = useState(false)
@@ -30,6 +33,18 @@ export function NavBar() {
     const stored = localStorage.getItem(STORAGE_KEY)
     if (stored === 'true') setCollapsed(true)
   }, [])
+
+  async function handleLogout() {
+    try {
+      await api.logout(getRefreshToken())
+    } catch {
+      // Best-effort - still clear local tokens and redirect below.
+    }
+    clearTokens()
+    router.push('/login')
+  }
+
+  if (pathname === '/login') return null
 
   function toggleCollapsed() {
     const next = !collapsed
@@ -150,6 +165,16 @@ export function NavBar() {
             )}
           </>
         )}
+
+        {/* Logout */}
+        <button
+          onClick={handleLogout}
+          title={collapsed ? 'Log out' : undefined}
+          className="flex items-center gap-3 w-full px-3 py-2 rounded-md text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+        >
+          <LogOut size={18} className="shrink-0" />
+          {!collapsed && <span>Log out</span>}
+        </button>
 
         {/* Collapse toggle */}
         <button
