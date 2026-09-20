@@ -2,6 +2,8 @@
 Authentication service with JWT token generation and validation.
 """
 
+import hashlib
+import secrets
 from datetime import datetime, timedelta
 
 from fastapi import Depends, HTTPException, status
@@ -13,6 +15,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..config import get_settings
 from ..database import get_db
+from ..models.refresh_token import RefreshToken
 from ..models.user import User
 
 settings = get_settings()
@@ -126,6 +129,97 @@ async def get_current_active_user(
     if not current_user.is_active:
         raise HTTPException(status_code=400, detail="Inactive user")
     return current_user
+
+
+async def get_user_from_token(token: str, db: AsyncSession) -> User | None:
+    """
+    Resolve a user from a JWT access token without raising.
+
+    Used by the WebSocket endpoint, which needs to choose its own close code
+    (4001/4003) rather than let an HTTPException propagate.
+    """
+    try:
+        payload = decode_access_token(token)
+    except HTTPException:
+        return None
+
+    email = payload.get("sub")
+    if email is None:
+        return None
+
+    result = await db.execute(select(User).where(User.email == email))
+    user = result.scalar_one_or_none()
+
+    if user is None or not user.is_active:
+        return None
+
+    return user
+
+
+def _hash_token(raw_token: str) -> str:
+    return hashlib.sha256(raw_token.encode()).hexdigest()
+
+
+async def create_refresh_token(user: User, db: AsyncSession) -> str:
+    """Issue a new refresh token for a user, persisting only its hash."""
+    raw_token = secrets.token_urlsafe(32)
+
+    refresh_token = RefreshToken(
+        user_id=user.user_id,
+        token_hash=_hash_token(raw_token),
+        expires_at=datetime.utcnow() + timedelta(days=settings.refresh_token_expire_days),
+    )
+    db.add(refresh_token)
+    await db.commit()
+
+    return raw_token
+
+
+async def rotate_refresh_token(raw_token: str, db: AsyncSession) -> tuple[str, str]:
+    """
+    Validate a refresh token, revoke it, and issue a new access/refresh pair.
+
+    Raises:
+        HTTPException: If the token is unknown, revoked, or expired.
+    """
+    result = await db.execute(
+        select(RefreshToken).where(RefreshToken.token_hash == _hash_token(raw_token))
+    )
+    stored = result.scalar_one_or_none()
+
+    if stored is None or stored.revoked_at is not None or stored.expires_at < datetime.utcnow():
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid or expired refresh token",
+        )
+
+    user_result = await db.execute(select(User).where(User.user_id == stored.user_id))
+    user = user_result.scalar_one_or_none()
+
+    if user is None or not user.is_active:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="User not found or inactive",
+        )
+
+    stored.revoked_at = datetime.utcnow()
+
+    new_access_token = create_access_token(data={"sub": user.email})
+    new_refresh_token = await create_refresh_token(user, db)
+
+    return new_access_token, new_refresh_token
+
+
+async def revoke_refresh_token(raw_token: str, db: AsyncSession) -> None:
+    """Revoke a refresh token (e.g. on logout). No-op if already revoked/unknown."""
+    result = await db.execute(
+        select(RefreshToken).where(RefreshToken.token_hash == _hash_token(raw_token))
+    )
+    stored = result.scalar_one_or_none()
+
+    if stored is not None and stored.revoked_at is None:
+        stored.revoked_at = datetime.utcnow()
+        await db.commit()
 
 
 def require_role(required_role: str):
