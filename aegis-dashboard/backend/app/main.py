@@ -10,7 +10,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from .api import websocket
 from .api.v1 import audit, auth, escalations, ingest, metrics, policies
 from .config import get_settings
-from .database import close_db, init_db
+from .database import close_db
 from .redis_client import close_redis
 
 settings = get_settings()
@@ -19,8 +19,10 @@ settings = get_settings()
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Lifespan events for startup and shutdown."""
-    # Startup
-    await init_db()
+    # Startup: schema is managed by Alembic migrations, run as a separate
+    # deploy step (`alembic upgrade head`) before the app starts - not
+    # applied here, so multiple replicas starting concurrently can't race
+    # each other into applying migrations.
     yield
     # Shutdown
     await close_db()

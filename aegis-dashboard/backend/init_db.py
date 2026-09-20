@@ -6,7 +6,10 @@ and escalations (pending, approved, denied, expired) — all properly linked.
 
 Usage
 -----
-From outside the container (DB exposed on 5433):
+Run migrations first (schema is managed by Alembic, not this script):
+    alembic upgrade head
+
+Then, from outside the container (DB exposed on 5433):
     cd aegis-dashboard/backend
     python init_db.py
 
@@ -34,7 +37,6 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
 from sqlalchemy.orm import sessionmaker
 
-from app.database import Base
 from app.models.audit import AuditRecord
 from app.models.escalation import Escalation
 from app.models.policy import Customer, Policy
@@ -675,11 +677,7 @@ async def init_database():
     async_session = sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
 
     try:
-        print("Creating tables ...")
-        async with engine.begin() as conn:
-            await conn.run_sync(Base.metadata.create_all)
-
-        print("\nSeeding customers & users ...")
+        print("Seeding customers & users ...")
         async with async_session() as session:
             for cfg in CUSTOMERS:
                 await seed_customer(session, cfg)

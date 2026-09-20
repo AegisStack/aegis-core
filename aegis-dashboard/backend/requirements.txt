@@ -4,7 +4,10 @@ uvicorn[standard]>=0.27.0
 python-multipart>=0.0.6
 
 # Database
-sqlalchemy>=2.0.25
+# [asyncio] extra pulls in greenlet, which SQLAlchemy's async engine
+# requires at runtime for every query regardless of driver - without it,
+# every DB-touching endpoint would raise ValueError at request time.
+sqlalchemy[asyncio]>=2.0.25
 asyncpg>=0.29.0
 alembic>=1.13.0
 psycopg2-binary>=2.9.9

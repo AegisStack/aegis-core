@@ -51,7 +51,10 @@ The frontend dev server runs separately on port 3003; see
 
 2. **Initialize database:**
 
-On first run, tables are created automatically by SQLAlchemy.
+Schema is managed by Alembic migrations (see [Database Migrations](#database-migrations)
+below); the backend container's start command runs `alembic upgrade head`
+automatically before starting the server, so this happens on first run
+without a separate step. Then seed demo data with `python init_db.py`.
 
 3. **Access API docs:**
 
@@ -73,9 +76,10 @@ cp .env.example .env
 # Edit .env with your database/redis URLs
 ```
 
-3. **Start backend:**
+3. **Apply migrations and start backend:**
 
 ```bash
+alembic upgrade head
 uvicorn app.main:app --reload
 ```
 

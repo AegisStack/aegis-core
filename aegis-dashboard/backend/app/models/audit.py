@@ -20,11 +20,15 @@ class AuditRecord(Base):
 
     __tablename__ = "audit_records"
 
-    # Primary key
+    # record_id is a UUID4, so this is unique in practice; timestamp joins
+    # the primary key (rather than record_id alone) because TimescaleDB
+    # requires every unique constraint on a hypertable to include its
+    # partitioning column - a record_id-only PK makes create_hypertable()
+    # fail outright.
     record_id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
 
     # Timestamp - partition key for TimescaleDB
-    timestamp = Column(DateTime(timezone=True), nullable=False, index=True)
+    timestamp = Column(DateTime(timezone=True), primary_key=True, nullable=False, index=True)
 
     # Context
     customer_id = Column(String(255), nullable=True, index=True)

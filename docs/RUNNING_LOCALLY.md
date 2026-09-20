@@ -94,6 +94,11 @@ docker-compose ps
 
 All services should show `Up` (Postgres and Redis show `Up (healthy)`).
 
+> The backend container's start command runs `alembic upgrade head` before
+> starting the server, so schema migrations are applied automatically here.
+> They are **not** run automatically if you start the backend outside
+> Docker (see [Running the Backend Without Docker](#running-the-backend-without-docker)).
+
 ### Step 2 — Initialize the database
 
 Seed tables, a demo customer, and demo users:
@@ -141,7 +146,8 @@ docker-compose up -d postgres redis   # data stores only
 cd backend
 cp .env.example .env                   # DATABASE_URL uses host port 5433
 pip install -r requirements.txt
-python init_db.py
+alembic upgrade head                   # apply schema migrations
+python init_db.py                      # seed demo data
 uvicorn app.main:app --reload --port 8000
 ```
 

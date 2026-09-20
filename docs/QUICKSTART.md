@@ -28,7 +28,9 @@ This starts PostgreSQL 15 + TimescaleDB and Redis, and the backend API (port 800
 
 ### Step 2: Initialize the Database
 
-Seeds tables plus a demo customer and users:
+Schema migrations run automatically as part of the backend container's start
+command (`alembic upgrade head`). This seeds a demo customer and users on top
+of that schema:
 
 ```bash
 cd backend

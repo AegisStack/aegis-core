@@ -44,12 +44,6 @@ async def get_db():
             await session.close()
 
 
-async def init_db():
-    """Initialize database - create all tables."""
-    async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
-
-
 async def close_db():
     """Close database connections."""
     await engine.dispose()
