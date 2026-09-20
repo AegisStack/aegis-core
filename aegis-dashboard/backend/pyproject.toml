@@ -11,13 +11,19 @@ requires-python = ">=3.10"
 dependencies = [
     "fastapi>=0.109.0",
     "uvicorn[standard]>=0.27.0",
-    "sqlalchemy>=2.0.25",
+    "sqlalchemy[asyncio]>=2.0.25",
     "asyncpg>=0.29.0",
     "alembic>=1.13.0",
     "redis>=5.0.1",
     "python-jose[cryptography]>=3.3.0",
+    "passlib>=1.7.4",
+    # passlib 1.7.4's bcrypt backend detection is incompatible with
+    # bcrypt>=4.1 (raises ValueError on hash instead of the version it
+    # expects) - pin below that until passlib is upgraded or replaced.
+    "bcrypt>=4.0.1,<4.1",
     "pydantic>=2.5.0",
     "pydantic-settings>=2.1.0",
+    "email-validator>=2.1.0",
     "pyyaml>=6.0",
 ]
 
@@ -27,6 +33,7 @@ dev = [
     "pytest-asyncio>=0.21.0",
     "pytest-cov>=4.1.0",
     "httpx>=0.26.0",
+    "aiosqlite>=0.19.0",
     "black==26.5.1",
     "ruff==0.16.1",
 ]

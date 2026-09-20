@@ -16,6 +16,9 @@ hiredis>=2.3.2
 # Authentication
 python-jose[cryptography]>=3.3.0
 passlib>=1.7.4
+# passlib 1.7.4's bcrypt backend detection is incompatible with bcrypt>=4.1
+# (raises ValueError on hash) - pin below that until passlib is upgraded.
+bcrypt>=4.0.1,<4.1
 python-dotenv>=1.0.0
 
 # Validation & Data
