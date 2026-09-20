@@ -1,4 +1,4 @@
-name: Lint
+name: CI
 
 on:
   pull_request:
@@ -6,7 +6,7 @@ on:
 
 # Cancel in-progress runs for the same PR when new commits are pushed.
 concurrency:
-  group: lint-${{ github.workflow }}-${{ github.ref }}
+  group: ci-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
 permissions:
@@ -60,6 +60,21 @@ jobs:
       - name: Mypy
         run: mypy aegis
 
+  sdk-tests:
+    name: Test SDK (Python)
+    needs: changes
+    if: needs.changes.outputs.sdk == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install dependencies
+        run: python -m pip install --upgrade pip && python -m pip install -e ".[dev]"
+      - name: Pytest
+        run: pytest tests -q
+
   backend:
     name: Lint Dashboard Backend (Python)
     needs: changes
@@ -80,6 +95,26 @@ jobs:
         run: ruff check app tests
       - name: Black
         run: black --check app tests
+
+  backend-tests:
+    name: Test Dashboard Backend (Python)
+    needs: changes
+    if: needs.changes.outputs.backend == 'true'
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: aegis-dashboard/backend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install dependencies
+        # Tests run against an in-memory SQLite DB (see tests/conftest.py),
+        # so no Postgres/Redis service containers are needed here.
+        run: python -m pip install --upgrade pip && python -m pip install -e ".[dev]"
+      - name: Pytest
+        run: pytest tests -q
 
   frontend:
     name: Lint Dashboard Frontend (TypeScript)
@@ -102,3 +137,23 @@ jobs:
         run: npm run lint
       - name: Type check
         run: npm run type-check
+
+  frontend-tests:
+    name: Test Dashboard Frontend (Jest)
+    needs: changes
+    if: needs.changes.outputs.frontend == 'true'
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: aegis-dashboard/frontend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+          cache-dependency-path: aegis-dashboard/frontend/package-lock.json
+      - name: Install dependencies
+        run: npm ci
+      - name: Jest
+        run: npm test -- --ci
