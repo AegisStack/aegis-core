@@ -3,6 +3,7 @@ Authentication service with JWT token generation and validation.
 """
 
 import hashlib
+import hmac
 import secrets
 from datetime import datetime, timedelta
 
@@ -35,6 +36,17 @@ def verify_password(plain_password: str, hashed_password: str) -> bool:
 def get_password_hash(password: str) -> str:
     """Hash a password."""
     return pwd_context.hash(password)
+
+
+def hash_api_key(raw_key: str) -> str:
+    """
+    Hash an SDK ingestion API key for storage/comparison.
+
+    Uses HMAC-SHA256 keyed with a dedicated pepper (not the JWT
+    secret_key) rather than a plain hash, so a database dump alone isn't
+    enough to forge a key even if the hashing scheme is known.
+    """
+    return hmac.new(settings.api_key_pepper.encode(), raw_key.encode(), hashlib.sha256).hexdigest()
 
 
 def create_access_token(data: dict, expires_delta: timedelta | None = None) -> str:

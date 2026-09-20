@@ -9,13 +9,16 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from ...database import get_db
 from ...models import AuditRecord, Customer
 from ...schemas import AuditRecordCreate
+from ...services.auth import hash_api_key
 
 router = APIRouter()
 
 
 async def verify_api_key(x_api_key: str = Header(...), db: AsyncSession = Depends(get_db)):
-    """Verify API key and return customer."""
-    result = await db.execute(select(Customer).where(Customer.api_key == x_api_key))
+    """Verify API key (by its hash) and return customer."""
+    result = await db.execute(
+        select(Customer).where(Customer.api_key_hash == hash_api_key(x_api_key))
+    )
     customer = result.scalar_one_or_none()
 
     if not customer or not customer.is_active:

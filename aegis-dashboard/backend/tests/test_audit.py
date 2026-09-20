@@ -137,7 +137,7 @@ async def test_query_audit_records_scoped_to_own_customer(
     other_customer = Customer(
         customer_id="other-customer",
         name="Other Customer",
-        api_key="other_api_key_123",
+        api_key_hash="other_api_key_123_hash",
         is_active=True,
     )
     db_session.add(other_customer)

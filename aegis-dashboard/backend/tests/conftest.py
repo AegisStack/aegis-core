@@ -12,7 +12,7 @@ from sqlalchemy.pool import StaticPool
 from app.database import Base, get_db
 from app.main import app
 from app.models import Customer, User
-from app.services.auth import create_access_token, get_password_hash
+from app.services.auth import create_access_token, get_password_hash, hash_api_key
 
 # Test database URL
 TEST_DATABASE_URL = "sqlite+aiosqlite:///:memory:"
@@ -81,15 +81,19 @@ async def client(db_session):
 @pytest.fixture(scope="function")
 async def test_customer(db_session):
     """Create a test customer with API key."""
+    raw_api_key = "test_api_key_123"
     customer = Customer(
         customer_id="test-customer",
         name="Test Customer",
-        api_key="test_api_key_123",
+        api_key_hash=hash_api_key(raw_api_key),
         is_active=True,
     )
     db_session.add(customer)
     await db_session.commit()
     await db_session.refresh(customer)
+    # Not a mapped column - only the hash is persisted. Stashed here so
+    # tests can still send the real key as a header without re-deriving it.
+    customer.api_key = raw_api_key
     return customer
 
 

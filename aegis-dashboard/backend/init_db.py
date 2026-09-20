@@ -41,7 +41,7 @@ from app.models.audit import AuditRecord
 from app.models.escalation import Escalation
 from app.models.policy import Customer, Policy
 from app.models.user import User
-from app.services.auth import get_password_hash
+from app.services.auth import get_password_hash, hash_api_key
 
 # ── helpers ──────────────────────────────────────────────────────────────────
 
@@ -444,7 +444,7 @@ async def seed_customer(session: AsyncSession, cfg: dict):
         Customer(
             customer_id=cfg["customer_id"],
             name=cfg["name"],
-            api_key=cfg["api_key"],
+            api_key_hash=hash_api_key(cfg["api_key"]),
         )
     )
     await session.flush()

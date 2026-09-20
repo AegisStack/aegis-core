@@ -66,7 +66,9 @@ class Customer(Base):
 
     customer_id = Column(String(255), primary_key=True)
     name = Column(String(255), nullable=False)
-    api_key = Column(String(255), nullable=False, unique=True, index=True)
+    # HMAC-SHA256 of the raw API key (see services/auth.hash_api_key) - the
+    # raw key is never stored, only ever shown once at creation time.
+    api_key_hash = Column(String(64), nullable=False, unique=True, index=True)
     created_at = Column(DateTime(timezone=True), nullable=False, default=datetime.utcnow)
     is_active = Column(Boolean, nullable=False, default=True)
 

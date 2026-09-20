@@ -32,6 +32,9 @@ class Settings(BaseSettings):
 
     # API Keys (for SDK ingestion)
     api_key_prefix: str = "ak_"
+    # HMAC key used to hash API keys at rest (separate from secret_key so a
+    # leaked JWT signing secret doesn't also make API keys forgeable).
+    api_key_pepper: str = "dev-api-key-pepper-change-in-production"
 
     # Rate Limiting
     rate_limit_per_minute: int = 100
