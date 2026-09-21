@@ -20,7 +20,7 @@ dependencies = [
     # passlib 1.7.4's bcrypt backend detection is incompatible with
     # bcrypt>=4.1 (raises ValueError on hash instead of the version it
     # expects) - pin below that until passlib is upgraded or replaced.
-    "bcrypt>=4.0.1,<4.1",
+    "bcrypt>=4.0.1,<5.1",
     "pydantic>=2.5.0",
     "pydantic-settings>=2.1.0",
     "email-validator>=2.1.0",
@@ -36,7 +36,7 @@ dev = [
     "httpx>=0.26.0",
     "aiosqlite>=0.19.0",
     "black==26.5.1",
-    "ruff==0.16.1",
+    "ruff==0.16.8",
 ]
 
 [tool.pytest.ini_options]
