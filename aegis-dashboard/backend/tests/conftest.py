@@ -8,6 +8,7 @@ import pytest
 from httpx import ASGITransport, AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 from sqlalchemy.pool import StaticPool
+from starlette.testclient import TestClient
 
 from app.database import Base, get_db
 from app.main import app
@@ -150,3 +151,30 @@ def viewer_headers(test_viewer_user):
     """Authorization header for a logged-in viewer of test_customer."""
     token = create_access_token(data={"sub": test_viewer_user.email})
     return {"Authorization": f"Bearer {token}"}
+
+
+@pytest.fixture(scope="function")
+def viewer_token(test_viewer_user):
+    """Raw access token (not a header dict) for a viewer of test_customer."""
+    return create_access_token(data={"sub": test_viewer_user.email})
+
+
+@pytest.fixture(scope="function")
+def ws_test_client(db_session):
+    """
+    Sync TestClient sharing the same overridden DB session as `client`.
+
+    Needed only for WebSocket tests: httpx's AsyncClient (used by `client`)
+    has no websocket support, so this uses Starlette's TestClient instead,
+    which does.
+    """
+
+    async def override_get_db():
+        yield db_session
+
+    app.dependency_overrides[get_db] = override_get_db
+
+    with TestClient(app) as tc:
+        yield tc
+
+    app.dependency_overrides.clear()

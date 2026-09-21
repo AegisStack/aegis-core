@@ -74,6 +74,26 @@ async def test_operator_can_resolve_and_resolved_by_is_server_derived(
 
 
 @pytest.mark.asyncio
+async def test_admin_can_also_resolve_escalations(
+    client, db_session, test_customer, admin_headers, test_admin_user
+):
+    """require_role("operator") is a floor, not an exact match - admin (a higher
+    role in the hierarchy) must pass it too."""
+    escalation = _make_escalation(test_customer.customer_id)
+    db_session.add(escalation)
+    await db_session.commit()
+
+    response = await client.post(
+        f"/api/v1/escalations/{escalation.escalation_id}/resolve",
+        json={"resolution": "denied"},
+        headers=admin_headers,
+    )
+
+    assert response.status_code == 200
+    assert response.json()["resolved_by"] == test_admin_user.email
+
+
+@pytest.mark.asyncio
 async def test_escalations_scoped_to_own_customer(
     client, db_session, test_customer, viewer_headers
 ):

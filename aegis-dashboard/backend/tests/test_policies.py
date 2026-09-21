@@ -46,6 +46,22 @@ async def test_create_policy_requires_admin(client, test_customer, viewer_header
 
 
 @pytest.mark.asyncio
+async def test_create_policy_requires_admin_not_just_operator(
+    client, test_customer, operator_headers
+):
+    """require_role("admin") is an exact floor at the top of the hierarchy -
+    operator (one level below) must still be rejected."""
+    policy_data = {
+        "agent_id": "test-agent",
+        "policy_yaml": "version: 1\nrules: []",
+    }
+
+    response = await client.post("/api/v1/policies", json=policy_data, headers=operator_headers)
+
+    assert response.status_code == 403
+
+
+@pytest.mark.asyncio
 async def test_create_policy_invalid_yaml(client, test_customer, admin_headers):
     """Test creating policy with invalid YAML."""
     policy_data = {
