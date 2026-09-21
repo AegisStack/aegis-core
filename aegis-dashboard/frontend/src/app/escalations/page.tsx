@@ -128,6 +128,7 @@ function EscalationCard({ escalation, onResolve }: {
 export default function EscalationsPage() {
   const { customerId } = useCustomer()
   const [statusFilter, setStatusFilter] = useState<string>('pending')
+  const [resolveError, setResolveError] = useState<string | null>(null)
   const queryClient = useQueryClient()
 
   const { data: escalations, isLoading } = useQuery({
@@ -144,9 +145,10 @@ export default function EscalationsPage() {
     mutationFn: ({ id, resolution }: { id: string; resolution: 'approved' | 'denied' }) =>
       api.resolveEscalation(id, { resolution }),
     onSuccess: () => {
-      // Invalidate and refetch
+      setResolveError(null)
       queryClient.invalidateQueries({ queryKey: ['escalations'] })
     },
+    onError: () => setResolveError('Failed to resolve escalation. Please try again.'),
   })
 
   const handleResolve = async (id: string, resolution: 'approved' | 'denied') => {
@@ -158,6 +160,12 @@ export default function EscalationsPage() {
   return (
     <div className="min-h-screen bg-background">
       <main className="container mx-auto px-4 py-8">
+        {resolveError && (
+          <div className="mb-4 p-3 rounded-md bg-destructive/10 text-destructive text-sm">
+            {resolveError}
+          </div>
+        )}
+
         {/* Status Filter */}
         <div className="mb-6 flex space-x-2">
           {['pending', 'approved', 'denied', 'expired'].map((status) => (

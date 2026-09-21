@@ -263,11 +263,11 @@ export default function DashboardPage() {
               <div className="grid gap-4 md:grid-cols-2">
                 <div>
                   <p className="text-sm text-muted-foreground">Average Latency</p>
-                  <p className="text-2xl font-bold">{metrics?.latency.avg.toFixed(2)}ms</p>
+                  <p className="text-2xl font-bold">{metrics?.latency?.avg?.toFixed(2) ?? '—'}ms</p>
                 </div>
                 <div>
                   <p className="text-sm text-muted-foreground">Max Latency</p>
-                  <p className="text-2xl font-bold">{metrics?.latency.max.toFixed(2)}ms</p>
+                  <p className="text-2xl font-bold">{metrics?.latency?.max?.toFixed(2) ?? '—'}ms</p>
                 </div>
               </div>
             </CardContent>

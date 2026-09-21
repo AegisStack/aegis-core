@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { api, type Policy } from '@/lib/api'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -399,16 +399,28 @@ function AgentOverviewCard({
 
 export default function PoliciesPage() {
   const { customerId } = useCustomer()
-  const [selectedAgent, setSelectedAgent] = useState('billing-agent')
+  const [selectedAgent, setSelectedAgent] = useState('')
   const [showEditor, setShowEditor] = useState(false)
   const [pageTab, setPageTab] = useState<'overview' | 'manage'>('overview')
   const [assigningPolicyId, setAssigningPolicyId] = useState<string | null>(null)
+  const [mutationError, setMutationError] = useState<string | null>(null)
   const queryClient = useQueryClient()
+
+  const { data: currentUser } = useQuery({
+    queryKey: ['currentUser'],
+    queryFn: () => api.getCurrentUser(),
+  })
 
   const { data: agents = [] } = useQuery({
     queryKey: ['agents', customerId],
     queryFn: () => api.getAgents(customerId),
   })
+
+  useEffect(() => {
+    if (!selectedAgent && agents.length > 0) {
+      setSelectedAgent(agents[0])
+    }
+  }, [agents, selectedAgent])
 
   // All active policies across every agent (used for overview)
   const { data: allActivePolicies = [] } = useQuery({
@@ -431,25 +443,31 @@ export default function PoliciesPage() {
         agent_id: selectedAgent,
         policy_yaml: data.yaml,
         description: data.description,
-        created_by: `admin@${customerId}`,
+        created_by: currentUser?.email,
       }),
     onSuccess: () => {
+      setMutationError(null)
       queryClient.invalidateQueries({ queryKey: ['policies'] })
       queryClient.invalidateQueries({ queryKey: ['agents'] })
       setShowEditor(false)
     },
+    onError: () => setMutationError('Failed to save policy. Please try again.'),
   })
 
   const activateMutation = useMutation({
     mutationFn: (policyId: string) => api.activatePolicy(policyId),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['policies'] }),
+    onSuccess: () => {
+      setMutationError(null)
+      queryClient.invalidateQueries({ queryKey: ['policies'] })
+    },
+    onError: () => setMutationError('Failed to activate policy. Please try again.'),
   })
 
   const assignMutation = useMutation({
     mutationFn: ({ policyId, targetAgentId }: { policyId: string; targetAgentId: string }) =>
       api.assignPolicy(policyId, {
         target_agent_id: targetAgentId,
-        created_by: `admin@${customerId}`,
+        created_by: currentUser?.email,
       }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['policies'] })
@@ -488,6 +506,11 @@ export default function PoliciesPage() {
   return (
     <div className="min-h-screen bg-background">
       <main className="container mx-auto px-4 py-8 space-y-6">
+        {mutationError && (
+          <div className="p-3 rounded-md bg-destructive/10 text-destructive text-sm">
+            {mutationError}
+          </div>
+        )}
         {/* Page-level tabs */}
         <Tabs value={pageTab} className="w-full">
           <TabsList>
