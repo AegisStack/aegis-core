@@ -8,13 +8,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
-- TBD
-
-### Changed
-- TBD
+- Dashboard JWT auth enforcement and tenant scoping on all audit/policy/metrics/escalation
+  endpoints and the `/ws/live` websocket (previously readable/writable by anyone with no token).
+- Refresh token rotation (`/api/v1/auth/refresh`), a dashboard login page, and a logout flow.
+- Alembic migrations for the dashboard backend (previously schema was created ad hoc via
+  `create_all()`), including a fix so `audit_records` is actually converted to a TimescaleDB
+  hypertable, which it never was despite being documented as one.
+- Hashed SDK ingestion API keys (`Customer.api_key_hash`, HMAC-SHA256) in place of plaintext.
+- Rate limiting on `/ingest/*` and `/auth/login`/`/auth/register`.
+- `SECURITY.md`, Dependabot config, and dependency-scanning CI jobs (`pip-audit`, `npm audit`).
+- CI now runs the SDK, backend, and frontend test suites on every PR (previously lint-only).
+- New backend tests for websocket auth close codes and role-hierarchy edge cases (34 backend
+  tests total, up from 28), and 104 new frontend tests covering every lib module, every
+  previously-untested component, and every page (119 frontend tests total, up from 15).
 
 ### Fixed
-- Corrected the `[0.1.0]` entry's frontend test count (was overstated as 24; actual count was 15).
+- Corrected the `[0.1.0]` entry's frontend test count (was overstated as 24; actual count was 15
+  at the time).
 - Fixed onboarding docs (`README.md`, `docs/QUICKSTART.md`, `docs/SDK_GUIDE.md`, `docs/RUNNING_LOCALLY.md`, `docs/RELEASING.md`) referencing a `wrap_tool` function that never existed in the public API; examples now use the real `aegis.wrap()`/`aegis.wrap_function_map()`.
 
 ## [0.1.0] - 2026-04-06
