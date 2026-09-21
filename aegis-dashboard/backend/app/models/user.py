@@ -3,7 +3,7 @@ User Model for authentication and authorization.
 """
 
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 
 from sqlalchemy import Boolean, Column, DateTime, ForeignKey, String
 from sqlalchemy.dialects.postgresql import UUID
@@ -32,7 +32,9 @@ class User(Base):
     is_verified = Column(Boolean, nullable=False, default=False)
 
     # Timestamps
-    created_at = Column(DateTime(timezone=True), nullable=False, default=datetime.utcnow)
+    created_at = Column(
+        DateTime(timezone=True), nullable=False, default=lambda: datetime.now(timezone.utc)
+    )
     last_login = Column(DateTime(timezone=True), nullable=True)
 
     def to_dict(self):

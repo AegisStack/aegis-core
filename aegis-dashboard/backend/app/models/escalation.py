@@ -2,7 +2,7 @@
 Escalation Model - Tracks escalation requests and resolutions.
 """
 
-from datetime import datetime
+from datetime import datetime, timezone
 
 from sqlalchemy import JSON, Column, DateTime, Index, String, Text
 from sqlalchemy.dialects.postgresql import UUID
@@ -40,7 +40,9 @@ class Escalation(Base):
     resolution_timestamp = Column(DateTime(timezone=True), nullable=True)
 
     # Timestamps
-    created_at = Column(DateTime(timezone=True), nullable=False, default=datetime.utcnow)
+    created_at = Column(
+        DateTime(timezone=True), nullable=False, default=lambda: datetime.now(timezone.utc)
+    )
     expires_at = Column(DateTime(timezone=True), nullable=False)
 
     __table_args__ = (

@@ -25,7 +25,7 @@ import os
 import random
 import sys
 import uuid
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 if sys.platform == "win32":
     os.system("chcp 65001 > nul")
@@ -51,11 +51,11 @@ def _hash(yaml_text: str) -> str:
 
 
 def _ago(**kwargs) -> datetime:
-    return datetime.utcnow() - timedelta(**kwargs)
+    return datetime.now(timezone.utc) - timedelta(**kwargs)
 
 
 def _from_now(**kwargs) -> datetime:
-    return datetime.utcnow() + timedelta(**kwargs)
+    return datetime.now(timezone.utc) + timedelta(**kwargs)
 
 
 # ── policy YAML templates ─────────────────────────────────────────────────────

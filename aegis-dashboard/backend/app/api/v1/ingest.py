@@ -83,7 +83,7 @@ async def ingest_audit_records(
 
     manager = get_connection_manager()
     for record in records:
-        await manager.broadcast_audit_record(customer.customer_id, record.dict())
+        await manager.broadcast_audit_record(customer.customer_id, record.model_dump())
 
     return {
         "status": "accepted",

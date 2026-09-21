@@ -2,7 +2,7 @@
 Metrics API - Dashboard statistics and aggregations.
 """
 
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy import and_, case, desc, func, select
@@ -59,7 +59,7 @@ async def get_metrics_timeseries(
     if interval not in INTERVAL_SECONDS:
         interval = "1m"
 
-    now = datetime.utcnow()
+    now = datetime.now(timezone.utc)
     start_time = datetime.fromisoformat(start) if start else now - timedelta(hours=1)
     end_time = datetime.fromisoformat(end) if end else now
 
@@ -137,8 +137,8 @@ async def get_metrics_explore(
     - Per-agent breakdown
     - Per-tool breakdown
     """
-    start_time = datetime.fromisoformat(start.replace("Z", "+00:00")).replace(tzinfo=None)
-    end_time = datetime.fromisoformat(end.replace("Z", "+00:00")).replace(tzinfo=None)
+    start_time = datetime.fromisoformat(start.replace("Z", "+00:00"))
+    end_time = datetime.fromisoformat(end.replace("Z", "+00:00"))
 
     base_filters = [
         AuditRecord.customer_id == current_user.customer_id,
@@ -258,7 +258,7 @@ async def get_metrics_summary(
     # Parse period
     period_map = {"1d": 1, "7d": 7, "30d": 30}
     days = period_map.get(period, 7)
-    start_time = datetime.utcnow() - timedelta(days=days)
+    start_time = datetime.now(timezone.utc) - timedelta(days=days)
 
     # Total calls
     total_query = select(func.count(AuditRecord.record_id)).where(

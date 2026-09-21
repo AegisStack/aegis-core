@@ -3,7 +3,7 @@ Policy Model - Stores customer policies with version history.
 """
 
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 
 from sqlalchemy import Boolean, Column, DateTime, Index, Integer, String, Text
 from sqlalchemy.dialects.postgresql import UUID
@@ -34,7 +34,9 @@ class Policy(Base):
     is_active = Column(Boolean, nullable=False, default=True)
 
     # Metadata
-    created_at = Column(DateTime(timezone=True), nullable=False, default=datetime.utcnow)
+    created_at = Column(
+        DateTime(timezone=True), nullable=False, default=lambda: datetime.now(timezone.utc)
+    )
     created_by = Column(String(255), nullable=True)
     description = Column(Text, nullable=True)
 
@@ -69,7 +71,9 @@ class Customer(Base):
     # HMAC-SHA256 of the raw API key (see services/auth.hash_api_key) - the
     # raw key is never stored, only ever shown once at creation time.
     api_key_hash = Column(String(64), nullable=False, unique=True, index=True)
-    created_at = Column(DateTime(timezone=True), nullable=False, default=datetime.utcnow)
+    created_at = Column(
+        DateTime(timezone=True), nullable=False, default=lambda: datetime.now(timezone.utc)
+    )
     is_active = Column(Boolean, nullable=False, default=True)
 
     def to_dict(self):
