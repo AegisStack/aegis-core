@@ -4,9 +4,9 @@ File-based audit sink with rotation support.
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
-from typing import Optional, TextIO
+from typing import Optional
 
 from ..audit.schema import AuditRecord
 
@@ -36,7 +36,6 @@ class FileSink:
         self.rotate = rotate
         self.buffer_size = buffer_size
         self._buffer: list[AuditRecord] = []
-        self._current_file: Optional[TextIO] = None
         self._current_date: Optional[str] = None
 
         # Create directory if it doesn't exist
@@ -45,25 +44,15 @@ class FileSink:
     def _get_file_path(self) -> Path:
         """Get the current file path based on rotation strategy."""
         if self.rotate == "daily":
-            date_str = datetime.now().strftime("%Y-%m-%d")
-            if self._current_date != date_str:
-                self._current_date = date_str
-                if self._current_file:
-                    self._current_file.close()
-                self._current_file = None
-
+            date_str = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+            self._current_date = date_str
             stem = self.base_path.stem
             suffix = self.base_path.suffix
             return self.base_path.parent / f"{stem}-{date_str}{suffix}"
 
         elif self.rotate == "hourly":
-            date_str = datetime.now().strftime("%Y-%m-%d-%H")
-            if self._current_date != date_str:
-                self._current_date = date_str
-                if self._current_file:
-                    self._current_file.close()
-                self._current_file = None
-
+            date_str = datetime.now(timezone.utc).strftime("%Y-%m-%d-%H")
+            self._current_date = date_str
             stem = self.base_path.stem
             suffix = self.base_path.suffix
             return self.base_path.parent / f"{stem}-{date_str}{suffix}"
@@ -103,9 +92,6 @@ class FileSink:
     def close(self) -> None:
         """Close the sink and flush any buffered records."""
         self.flush()
-        if self._current_file:
-            self._current_file.close()
-            self._current_file = None
 
     def __del__(self) -> None:
         """Ensure file is closed on deletion."""

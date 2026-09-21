@@ -60,6 +60,7 @@ class EscalationManager:
         timeout_minutes: int = 30,
         on_escalate: str = "block",
         resolve_callback: Optional[Callable[[str], dict[str, str]]] = None,
+        dashboard_url: Optional[str] = None,
     ):
         """
         Initialize escalation manager.
@@ -69,11 +70,15 @@ class EscalationManager:
             timeout_minutes: Default timeout for escalations
             on_escalate: 'block' (wait for resolution) or 'notify_and_proceed' (continue)
             resolve_callback: Optional callback to check for resolutions
+            dashboard_url: Base URL of the Aegis Dashboard for resolve links
+                           (e.g. 'http://localhost:8000'). Defaults to the
+                           hosted service.
         """
         self.webhook_url = webhook_url
         self.timeout_minutes = timeout_minutes
         self.on_escalate = on_escalate
         self.resolve_callback = resolve_callback
+        self.dashboard_url = (dashboard_url or "https://api.aegis.dev").rstrip("/")
 
         # Track active escalations
         self._escalations: dict[str, EscalationRequest] = {}
@@ -145,7 +150,9 @@ class EscalationManager:
             "tool_name": escalation.tool_name,
             "params": escalation.params,
             "reason": escalation.reason,
-            "resolve_url": f"https://api.aegis.dev/v1/escalations/{escalation.escalation_id}/resolve",
+            "resolve_url": (
+                f"{self.dashboard_url}/v1/escalations/{escalation.escalation_id}/resolve"
+            ),
             "expires_at": escalation.expires_at.isoformat(),
         }
 
