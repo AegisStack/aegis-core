@@ -99,5 +99,6 @@ class WebhookSink:
             self._worker_thread.join(timeout=5)
 
     def __del__(self) -> None:
-        """Ensure cleanup on deletion."""
-        self.close()
+        """Best-effort cleanup on deletion — does not block."""
+        if self.async_mode:
+            self._stop_event.set()

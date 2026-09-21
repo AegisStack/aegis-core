@@ -170,11 +170,11 @@ class ToolWrapper:
                     # Otherwise, escalation was approved - continue to execution
 
         # Handle ALLOW outcome - execute the tool
+        result = None
+        execution_error = None
         try:
             result = self.tool(*args, **kwargs)
-            execution_error = None
         except Exception as e:
-            result = None
             execution_error = str(e)
             # Re-raise the exception
             raise
