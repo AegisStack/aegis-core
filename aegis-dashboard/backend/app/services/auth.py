@@ -5,7 +5,7 @@ Authentication service with JWT token generation and validation.
 import hashlib
 import hmac
 import secrets
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
@@ -62,9 +62,11 @@ def create_access_token(data: dict, expires_delta: timedelta | None = None) -> s
     """
     to_encode = data.copy()
     if expires_delta:
-        expire = datetime.utcnow() + expires_delta
+        expire = datetime.now(timezone.utc) + expires_delta
     else:
-        expire = datetime.utcnow() + timedelta(minutes=settings.access_token_expire_minutes)
+        expire = datetime.now(timezone.utc) + timedelta(
+            minutes=settings.access_token_expire_minutes
+        )
 
     to_encode.update({"exp": expire})
     encoded_jwt = jwt.encode(to_encode, settings.secret_key, algorithm=settings.algorithm)
@@ -179,7 +181,7 @@ async def create_refresh_token(user: User, db: AsyncSession) -> str:
     refresh_token = RefreshToken(
         user_id=user.user_id,
         token_hash=_hash_token(raw_token),
-        expires_at=datetime.utcnow() + timedelta(days=settings.refresh_token_expire_days),
+        expires_at=datetime.now(timezone.utc) + timedelta(days=settings.refresh_token_expire_days),
     )
     db.add(refresh_token)
     await db.commit()
@@ -199,7 +201,8 @@ async def rotate_refresh_token(raw_token: str, db: AsyncSession) -> tuple[str, s
     )
     stored = result.scalar_one_or_none()
 
-    if stored is None or stored.revoked_at is not None or stored.expires_at < datetime.utcnow():
+    now = datetime.now(timezone.utc)
+    if stored is None or stored.revoked_at is not None or stored.expires_at < now:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid or expired refresh token",
@@ -214,7 +217,7 @@ async def rotate_refresh_token(raw_token: str, db: AsyncSession) -> tuple[str, s
             detail="User not found or inactive",
         )
 
-    stored.revoked_at = datetime.utcnow()
+    stored.revoked_at = datetime.now(timezone.utc)
 
     new_access_token = create_access_token(data={"sub": user.email})
     new_refresh_token = await create_refresh_token(user, db)
@@ -230,7 +233,7 @@ async def revoke_refresh_token(raw_token: str, db: AsyncSession) -> None:
     stored = result.scalar_one_or_none()
 
     if stored is not None and stored.revoked_at is None:
-        stored.revoked_at = datetime.utcnow()
+        stored.revoked_at = datetime.now(timezone.utc)
         await db.commit()
 
 
