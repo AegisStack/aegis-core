@@ -6,10 +6,11 @@ Decorator for MCP tool handlers with policy enforcement.
 
 from __future__ import annotations
 
+import asyncio
 import functools
 from typing import Any, Callable, Optional, Union
 
-from ..core.wrapper import wrap
+from ..core.wrapper import ToolWrapper, wrap
 
 
 def mcp_enforce(
@@ -24,9 +25,12 @@ def mcp_enforce(
     Decorator for MCP tool call handlers.
 
     Wraps the handler with policy enforcement before the tool logic executes.
+    The policy is loaded once at decoration time (or per-call if a callable is
+    provided for dynamic customer policies).
 
     Args:
-        policy: Path to YAML policy file, inline dict, or callable that returns policy
+        policy: Path to YAML policy file, inline dict, or callable that returns
+                policy (called with context on each invocation)
         agent_id: Agent identifier
         customer_id: Customer identifier (or callable to extract from context)
         on_deny: How to handle denials ('raise', 'return_error', 'silent')
@@ -51,43 +55,61 @@ def mcp_enforce(
         ...     if name == 'issue_refund':
         ...         return await issue_refund(**arguments)
     """
+    # Cache a ToolWrapper for static policies so policy/engine/manager are not
+    # re-created on every call. Dynamic (callable) policies still resolve per call.
+    _static_wrapper: Optional[ToolWrapper] = None
+    if not callable(policy) and not callable(customer_id):
+        _wrapped: list[ToolWrapper] = wrap(  # type: ignore[assignment]
+            tools=[lambda **_: None],  # placeholder; replaced per-call below
+            policy=policy,
+            agent_id=agent_id,
+            customer_id=customer_id,
+            on_deny=on_deny,
+            on_escalate=on_escalate,
+            **kwargs,
+        )
+        _static_wrapper = _wrapped[0]
 
     def decorator(func: Callable) -> Callable:
         @functools.wraps(func)
         async def wrapper(name: str, arguments: dict, context: Any = None) -> Any:
-            # Resolve policy if callable
+            # Resolve dynamic policy/customer_id
             if callable(policy):
                 resolved_policy = policy(context)
             else:
                 resolved_policy = policy
 
-            # Resolve customer_id if callable
-            resolved_customer_id = customer_id
-            if callable(customer_id) and context:
-                resolved_customer_id = customer_id(context)
+            resolved_customer_id = customer_id(context) if callable(customer_id) else customer_id
 
-            # Create a temporary tool function for this specific call
-            async def temp_tool(**args: Any) -> Any:
-                return await func(name, args, context)
+            # Build a sync shim so ToolWrapper (which calls tools synchronously)
+            # can invoke the async MCP handler correctly.
+            def sync_shim(**args: Any) -> Any:
+                coro = func(name, args, context)
+                return asyncio.get_event_loop().run_until_complete(coro)
 
-            # Set the name for policy evaluation
-            temp_tool.__name__ = name
+            sync_shim.__name__ = name
 
-            # Wrap and execute
-            wrapped_tools = wrap(
-                tools=[temp_tool],
-                policy=resolved_policy,
-                agent_id=agent_id,
-                customer_id=resolved_customer_id,
-                on_deny=on_deny,
-                on_escalate=on_escalate,
-                **kwargs,
-            )
+            tool_wrapper: ToolWrapper
+            if _static_wrapper is not None:
+                # Re-use the cached wrapper; swap out the underlying tool shim.
+                _static_wrapper.tool = sync_shim  # type: ignore[attr-defined]
+                tool_wrapper = _static_wrapper
+            else:
+                _dyn_wrapped: list[ToolWrapper] = wrap(  # type: ignore[assignment]
+                    tools=[sync_shim],
+                    policy=resolved_policy,
+                    agent_id=agent_id,
+                    customer_id=resolved_customer_id,
+                    on_deny=on_deny,
+                    on_escalate=on_escalate,
+                    **kwargs,
+                )
+                tool_wrapper = _dyn_wrapped[0]
 
-            wrapped_tool = wrapped_tools[0]
-
-            # Execute with enforcement
-            return await wrapped_tool(**arguments)
+            # Run the synchronous ToolWrapper in a thread pool to avoid blocking
+            # the event loop (ToolWrapper.__call__ is sync).
+            loop = asyncio.get_event_loop()
+            return await loop.run_in_executor(None, lambda: tool_wrapper(**arguments))
 
         return wrapper
 
