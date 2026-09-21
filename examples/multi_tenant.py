@@ -21,7 +21,7 @@ def main():
     )
 
     # For different customers
-    customers = ["acme-corp", "techco"]
+    customers = ["example-billing", "techco"]
 
     for customer in customers:
         print(f"\n=== Customer: {customer} ===")

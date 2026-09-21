@@ -340,7 +340,7 @@ npm test
 **Backend tests (requires database):**
 ```bash
 cd aegis-dashboard
-docker-compose up -d db
+docker-compose up -d postgres redis
 cd backend
 pytest tests/ -v
 ```

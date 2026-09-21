@@ -10,6 +10,7 @@ const inter = Inter({ subsets: ['latin'] })
 export const metadata: Metadata = {
   title: 'Aegis Dashboard',
   description: 'Policy enforcement and observability for agent systems',
+  icons: { icon: '/aegis.png' },
 }
 
 export default function RootLayout({
