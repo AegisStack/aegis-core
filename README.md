@@ -50,11 +50,13 @@ aegis-core/
 
 ## Installation
 
-**SDK only:**
+**SDK only (from PyPI):**
 
 ```bash
-pip install -e .
+pip install aegis-sdk
 ```
+
+For local development, clone this repository and use `pip install -e ".[dev]"`.
 
 **Full platform (SDK + dashboard):** see [Running Locally](docs/RUNNING_LOCALLY.md).
 
