@@ -1,12 +1,12 @@
 # Releasing Aegis SDK
 
-This guide releases the Python SDK (`aegis-sdk`) to PyPI. The dashboard is not
+This guide releases the Python SDK (`aegis-core-sdk`) to PyPI. The dashboard is not
 included in the published package.
 
 ## One-time setup
 
 1. Create a PyPI account and enable two-factor authentication.
-2. Confirm that `aegis-sdk` is an available PyPI project name.
+2. Confirm that `aegis-core-sdk` is an available PyPI project name.
 3. In PyPI, open **Publishing** → **Add a new pending publisher** and select
    GitHub. Enter:
    - Owner: `AegisStack`
@@ -71,7 +71,7 @@ After the workflow succeeds, use a new environment outside the repository:
 
 ```powershell
 python -m venv aegis-verify
-.\aegis-verify\Scripts\python.exe -m pip install aegis-sdk==0.1.0
+.\aegis-verify\Scripts\python.exe -m pip install aegis-core-sdk==0.1.0
 .\aegis-verify\Scripts\python.exe -c "from aegis import PolicyEngine; print('OK')"
 ```
 

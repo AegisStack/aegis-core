@@ -174,13 +174,13 @@ Operator
 
 4. SDK Interface
 4.1 Installation
-pip install aegis-sdk
+pip install aegis-core-sdk
 	 
 	# With LangChain integration
-	pip install aegis-sdk[langchain]
+	pip install aegis-core-sdk[langchain]
 	 
 	# With MCP server integration
-	pip install aegis-sdk[mcp]
+	pip install aegis-core-sdk[mcp]
 	
 
 4.2 aegis.wrap()

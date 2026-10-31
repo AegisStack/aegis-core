@@ -5,7 +5,7 @@ Policy enforcement framework for AI agent tool calls.
 ## Installation
 
 ```bash
-pip install aegis-sdk
+pip install aegis-core-sdk
 ```
 
 Or from source:

@@ -53,7 +53,7 @@ aegis-core/
 **SDK only (from PyPI):**
 
 ```bash
-pip install aegis-sdk
+pip install aegis-core-sdk
 ```
 
 For local development, clone this repository and use `pip install -e ".[dev]"`.
